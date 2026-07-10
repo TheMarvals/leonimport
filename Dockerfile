@@ -12,13 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci
+COPY prisma ./prisma
+RUN npm install --include=dev
 
 COPY . .
 
-RUN npx prisma generate \
-    && npm run build
+RUN npx prisma generate --schema=./prisma/schema.prisma \
+    && npm run build \
+    && npm prune --omit=dev
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push && npm run start -- --hostname 0.0.0.0 --port ${PORT:-3000}"]
+CMD ["sh", "-c", "npx prisma db push --schema=./prisma/schema.prisma && npm run start -- --hostname 0.0.0.0 --port ${PORT:-3000}"]
