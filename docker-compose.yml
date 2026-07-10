@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: leonimport-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: leonimport
+      POSTGRES_PASSWORD: leonimport2024
+      POSTGRES_DB: leonimport_wms
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: leonimport-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+volumes:
+  pgdata:

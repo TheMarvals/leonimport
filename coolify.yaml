@@ -1,0 +1,17 @@
+services:
+  - name: leoniimport-wms
+    dockerfile_path: /Dockerfile
+    build_pack: docker
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      REDIS_URL: ${REDIS_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION}
+      ML_GATEWAY_URL: ${ML_GATEWAY_URL}
+      ML_GATEWAY_API_KEY: ${ML_GATEWAY_API_KEY}
+      ML_ACCOUNT_ID: ${ML_ACCOUNT_ID}
+      ML_SELLER_ID: ${ML_SELLER_ID}

@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  pin       String
+  plainPin  String?
+  role      UserRole @default(PICKER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Supplier {
+  id        String            @id @default(uuid())
+  name      String
+  contact   String?
+  country   String?
+  notes     String?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  products  ProductSupplier[]
+}
+
+model Product {
+  id         String            @id @default(uuid())
+  sku        String            @unique
+  name       String
+  brand      String?
+  color      String?
+  size       String?
+  imageUrl   String?
+  salePrice  Float?
+  currency   String            @default("CLP")
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  mlAliases      String[]          @default([])
+  categoryFamily Int?                                   // 1000, 5000, 11000, etc.
+  mlCategoryPath String?                                // "Belleza > Maquillaje > Labiales"
+  orderItems     OrderItem[]
+  locations      ProductLocation[]
+  suppliers      ProductSupplier[]
+}
+
+model ProductSupplier {
+  id         String   @id @default(uuid())
+  productId  String
+  supplierId String
+  costPrice  Float
+  currency   String   @default("CLP")
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  product    Product  @relation(fields: [productId], references: [id])
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  @@unique([productId, supplierId])
+}
+
+model Location {
+  id            String            @id @default(uuid())
+  aisle         String
+  section       String
+  level         String
+  sequenceIndex Int
+  isActive      Boolean           @default(true)
+  products      ProductLocation[]
+}
+
+model ProductLocation {
+  id         String   @id @default(uuid())
+  productId  String
+  locationId String
+  quantity   Int      @default(0)
+  location   Location @relation(fields: [locationId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([productId, locationId])
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  mlId           String      @unique
+  mlOrderId      BigInt?
+  shippingId     String?
+  status         OrderStatus @default(PENDING)
+  lockedBy       String?
+  lockExpiresAt  DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  packedByUserId String?
+  packingStation String?
+  shippedAt      DateTime?
+  isFlex         Boolean     @default(false)
+  priorityMessage String?
+  buyerName      String?
+  pickingMethod  String?
+  packingMethod  String?
+  auditLogs      AuditLog[]
+  items          OrderItem[]
+}
+
+model OrderItem {
+  id             String  @id @default(uuid())
+  orderId        String
+  productId      String
+  quantityTotal  Int
+  quantityPicked Int     @default(0)
+  mlImageUrl     String?
+  order          Order   @relation(fields: [orderId], references: [id])
+  product        Product @relation(fields: [productId], references: [id])
+
+  @@unique([orderId, productId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  orderId   String?
+  userId    String
+  action    String
+  metadata  Json?
+  timestamp DateTime @default(now())
+  order     Order?   @relation(fields: [orderId], references: [id])
+}
+
+model SyncConflict {
+  id         String    @id @default(uuid())
+  orderId    String
+  userId     String
+  payload    Json
+  status     String    @default("PENDING_REVIEW")
+  resolvedBy String?
+  resolvedAt DateTime?
+  timestamp  DateTime  @default(now())
+}
+
+model EmergencyLock {
+  key       String   @id
+  userId    String
+  expiresAt DateTime
+}
+
+model SyncLog {
+  id                 String      @id @default(uuid())
+  startedAt          DateTime    @default(now())
+  completedAt        DateTime?
+  durationMs         Int?
+  status             SyncStatus @default(SUCCESS)
+  imported           Int         @default(0)
+  skipped            Int         @default(0)
+  resolutionRequired Int         @default(0)
+  totalProcessed     Int         @default(0)
+  error              String?
+  reusedBySku        Int         @default(0)
+  reusedByAlias      Int         @default(0)
+  autoCreated        Int         @default(0)
+  missingCreated     Int         @default(0)
+  createdAt          DateTime    @default(now())
+}
+
+enum SyncStatus {
+  SUCCESS
+  ERROR
+}
+
+enum OrderStatus {
+  PENDING
+  PICKING
+  RESOLUTION_REQUIRED
+  PACKING
+  SHIPPED
+  CANCELLED
+}
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  PICKER
+  PACKER
+}
