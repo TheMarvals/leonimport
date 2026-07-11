@@ -22,7 +22,12 @@ import {
   Shuffle,
   Grid3X3,
   GitMerge,
-  Users
+  Users,
+  ChevronDown,
+  ChevronUp,
+  ListFilter,
+  UserRound,
+  TriangleAlert
 } from 'lucide-react';
 import { getHighResImageUrl } from '@/lib/image-utils';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
@@ -64,6 +69,9 @@ export const SupervisorDashboard = () => {
   // ─── Search states ───
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [conflictsSearchTerm, setConflictsSearchTerm] = useState('');
+  const [auditSearchTerm, setAuditSearchTerm] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState('ALL');
+  const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
   
   // ─── Pagination states ───
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
@@ -262,38 +270,82 @@ export const SupervisorDashboard = () => {
       'STOCK_ADJUST': 'Ajuste de Inventario',
       'INVALID_SCAN': 'Lectura Inválida',
       'START_PICKING': 'Inicio de Picking',
+      'PICKING_STARTED': 'Picking iniciado',
       'COMPLETE_PICKING': 'Picking Completado',
+      'PICKING_COMPLETED': 'Picking completado',
       'CANCEL_PICKING': 'Picking Cancelado',
+      'PICKING_CANCELLED': 'Picking cancelado',
+      'PICK_ITEM': 'Producto recolectado',
       'START_PACKING': 'Inicio de Packing',
+      'PACKING_STARTED': 'Packing iniciado',
       'COMPLETE_PACKING': 'Packing Completado',
+      'PACKING_COMPLETED': 'Packing completado',
       'CANCEL_PACKING': 'Packing Cancelado',
+      'PACKING_CANCELLED': 'Packing cancelado',
       'MERGE_PRODUCTS': 'Productos Fusionados',
     };
-    return labels[action] || action;
+    return labels[action] || action.replaceAll('_', ' ').toLowerCase().replace(/^./, letter => letter.toUpperCase());
   };
 
   const getActionStyle = (action: string) => {
-    if (action.includes('CREATE')) return 'bg-green-500/10 border-green-500/35 text-green-400 border border-green-500/20';
-    if (action.includes('DELETE')) return 'bg-red-500/10 border-red-500/35 text-red-400 border border-red-500/20';
-    if (action.includes('STOCK_ADJUST')) return 'bg-amber-500/10 border-amber-500/35 text-amber-400 border border-amber-500/20';
-    if (action.includes('INVALID_SCAN')) return 'bg-rose-500/10 border-rose-500/35 text-rose-400 border border-rose-500/20';
-    return 'bg-blue-500/10 border-blue-500/35 text-blue-400 border border-blue-500/20';
+    if (action.includes('COMPLETE') || action.includes('COMPLETED') || action.includes('CREATE')) return 'bg-emerald-500/10 text-emerald-300 ring-1 ring-inset ring-emerald-500/25';
+    if (action.includes('CANCEL') || action.includes('DELETE') || action.includes('INVALID')) return 'bg-rose-500/10 text-rose-300 ring-1 ring-inset ring-rose-500/25';
+    if (action.includes('STOCK') || action.includes('MERGE')) return 'bg-amber-500/10 text-amber-300 ring-1 ring-inset ring-amber-500/25';
+    if (action.includes('PACK')) return 'bg-violet-500/10 text-violet-300 ring-1 ring-inset ring-violet-500/25';
+    return 'bg-blue-500/10 text-blue-300 ring-1 ring-inset ring-blue-500/25';
+  };
+
+  const metadataOf = (log: any): Record<string, any> => {
+    if (!log.metadata) return {};
+    if (typeof log.metadata === 'string') {
+      try { return JSON.parse(log.metadata); } catch { return { detalle: log.metadata }; }
+    }
+    return log.metadata;
   };
 
   const formatMetadata = (log: any) => {
-    if (!log.metadata) return '—';
-    const m = log.metadata;
+    const m = metadataOf(log);
     if (log.action === 'STOCK_ADJUST') {
-      return `SKU: ${m.sku || '—'} | Ubicación: ${m.location || '—'} | Stock: ${m.quantityBefore} → ${m.quantityAfter} (${m.note || 'Ajuste'})`;
+      return `${m.sku || 'Producto'} pasó de ${m.quantityBefore ?? '—'} a ${m.quantityAfter ?? '—'} unidades${m.location ? ` en ${m.location}` : ''}.`;
     }
     if (log.action === 'CREATE_PRODUCT' || log.action === 'DELETE_PRODUCT') {
-      return `SKU: ${m.sku || '—'} | Nombre: ${m.name || '—'}`;
+      return `${m.sku || 'Sin SKU'} · ${m.name || 'Producto sin nombre'}`;
     }
     if (log.action === 'INVALID_SCAN') {
-      return `Ráfaga: ${m.burst || '—'} | DeltaT: ${m.deltaT}ms | Mesa: ${m.station}`;
+      return `Lectura rechazada${m.station ? ` en mesa ${m.station}` : ''}${m.deltaT ? ` (${m.deltaT} ms)` : ''}.`;
     }
-    return typeof m === 'object' ? JSON.stringify(m) : String(m);
+    if (log.action === 'PICKING_STARTED' || log.action === 'START_PICKING') {
+      const count = Array.isArray(m.orderIds) ? m.orderIds.length : 1;
+      return `Se inició la recolección de ${count} ${count === 1 ? 'orden' : 'órdenes'}.`;
+    }
+    if (log.action === 'PICKING_CANCELLED' || log.action === 'CANCEL_PICKING') {
+      return `Recolección interrumpida. ${m.restoredUnits ?? 0} unidades restauradas y ${m.resetItems ?? 0} productos reiniciados.`;
+    }
+    if (log.action === 'PICK_ITEM') {
+      return `${m.quantity ?? 1} unidad recolectada${m.method ? ` mediante ${m.method === 'SCANNER' ? 'escáner' : m.method.toLowerCase()}` : ''}${m.locationId ? ` desde ${m.locationId}` : ''}.`;
+    }
+    if (log.action.includes('PACKING')) {
+      return m.orderId ? `Operación de packing sobre la orden ${m.orderId}.` : 'Operación registrada en el flujo de packing.';
+    }
+    if (log.action === 'MERGE_PRODUCTS') {
+      return `${m.sourceSku || 'Producto duplicado'} fue fusionado dentro de ${m.targetSku || 'producto principal'}.`;
+    }
+    const values = Object.values(m).filter(value => value !== null && value !== undefined);
+    return values.length ? 'Evento registrado correctamente. Abre el detalle para consultar sus datos.' : 'Evento registrado sin datos adicionales.';
   };
+
+  const auditActions = [...new Set(auditLogs.map((log: any) => log.action as string))].sort();
+  const filteredAuditLogs = auditLogs.filter((log: any) => {
+    const search = auditSearchTerm.trim().toLowerCase();
+    const matchesAction = auditActionFilter === 'ALL' || log.action === auditActionFilter;
+    const matchesSearch = !search ||
+      log.userId?.toLowerCase().includes(search) ||
+      getActionLabel(log.action).toLowerCase().includes(search) ||
+      formatMetadata(log).toLowerCase().includes(search);
+    return matchesAction && matchesSearch;
+  });
+  const auditOperatorCount = new Set(auditLogs.map((log: any) => log.userId)).size;
+  const auditIncidentCount = auditLogs.filter((log: any) => /CANCEL|INVALID|DELETE/.test(log.action)).length;
 
   return (
     <div className="min-h-screen bg-black text-white p-4 lg:p-6 font-sans md:overflow-hidden md:h-screen flex flex-col">
@@ -1045,85 +1097,88 @@ export const SupervisorDashboard = () => {
       {/* TAB: AUDITORÍA */}
       {/* ═══════════════════════════════════ */}
       {activeTab === 'audit' && (
-        <section className="bg-wms-surface border-2 border-white/10 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] flex flex-col flex-1 min-h-0 shadow-2xl overflow-hidden">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-6 flex-shrink-0">
-            <div className="flex items-center gap-3 md:gap-4">
-              <Activity size={24} className="text-purple-500 md:w-8 md:h-8" strokeWidth={3} />
-              <h2 className="text-xl md:text-3xl font-black italic uppercase tracking-tighter">Bitácora de Auditoría</h2>
-            </div>
-          </div>
-          
-          <div className="overflow-hidden border-2 border-white/10 rounded-xl md:rounded-2xl flex-1 flex flex-col min-h-0 bg-black">
-            <div className="overflow-y-auto custom-scrollbar flex-1 min-h-0">
-              {/* VISTA MÓVIL: CARDS */}
-              <div className="md:hidden flex flex-col divide-y-2 divide-white/5">
-                {auditLogs.map((log: any) => (
-                  <div key={`mob-audit-${log.id}`} className="flex flex-col p-4 gap-2 hover:bg-purple-500/5 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-flex items-center font-mono font-bold text-xs px-2 py-0.5 rounded-lg bg-wms-card border border-wms-border/70 text-white shadow-sm">
-                        {log.userId}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-wms-muted">
-                        <Clock size={10} />
-                        {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                      </div>
-                    </div>
-                    <span className={`inline-flex items-center self-start px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${getActionStyle(log.action)}`}>
-                      {getActionLabel(log.action)}
-                    </span>
-                    <p className="text-xs text-white/70 leading-relaxed font-medium">
-                      {formatMetadata(log)}
-                    </p>
+        <section className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden">
+          <div className="relative overflow-hidden rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-500/10 via-wms-surface to-wms-surface p-5 shadow-[0_20px_60px_rgba(0,0,0,0.35)] md:p-7">
+            <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-purple-500/10 blur-3xl" />
+            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-500/15 text-purple-300 ring-1 ring-inset ring-purple-500/25"><Activity size={22} /></div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-purple-300/70">Control y trazabilidad</p>
+                    <h2 className="text-2xl font-black uppercase tracking-tight text-white md:text-3xl">Bitácora de actividad</h2>
                   </div>
-                ))}
-                {auditLogs.length === 0 && (
-                  <p className="text-center py-10 text-white/10 text-xs font-black uppercase tracking-[0.5em]">Sin logs registrados</p>
-                )}
+                </div>
+                <p className="max-w-2xl text-sm leading-6 text-wms-muted">Consulta quién realizó cada operación y revisa el contexto sin exponer datos técnicos innecesarios.</p>
               </div>
 
-              {/* VISTA ESCRITORIO: TABLA */}
-              <table className="hidden md:table w-full text-left border-collapse table-fixed">
-                <thead className="bg-wms-bg sticky top-0 z-10 shadow-2xl border-b-2 border-white/10">
-                  <tr>
-                    <th className="p-5 text-xs font-black text-white uppercase tracking-widest w-48">Hora</th>
-                    <th className="p-5 text-xs font-black text-white uppercase tracking-widest w-48">Operario</th>
-                    <th className="p-5 text-xs font-black text-white uppercase tracking-widest w-56">Acción</th>
-                    <th className="p-5 text-xs font-black text-white uppercase tracking-widest">Detalles</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-white/5">
-                  {auditLogs.map((log: any) => (
-                    <tr key={log.id} className="hover:bg-purple-500/5 transition-all duration-150 group cursor-default border-b border-white/5 last:border-0">
-                      <td className="p-5 whitespace-nowrap">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-wms-muted font-mono group-hover:text-white transition-colors">
-                          <Clock size={12} className="text-wms-muted group-hover:text-purple-400 transition-colors" />
-                          {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="min-w-0 rounded-2xl border border-white/5 bg-black/25 p-3 sm:min-w-28"><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Eventos</p><p className="mt-1 text-xl font-black text-white">{auditLogs.length}</p></div>
+                <div className="min-w-0 rounded-2xl border border-white/5 bg-black/25 p-3 sm:min-w-28"><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Operarios</p><p className="mt-1 text-xl font-black text-blue-300">{auditOperatorCount}</p></div>
+                <div className="min-w-0 rounded-2xl border border-white/5 bg-black/25 p-3 sm:min-w-28"><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Alertas</p><p className="mt-1 text-xl font-black text-rose-300">{auditIncidentCount}</p></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-wms-surface shadow-2xl">
+            <div className="grid gap-3 border-b border-white/5 p-4 sm:grid-cols-[1fr_16rem]">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-wms-muted" size={18} />
+                <input value={auditSearchTerm} onChange={event => setAuditSearchTerm(event.target.value)} placeholder="Buscar por operario, acción o detalle..." className="min-h-12 w-full rounded-xl border border-wms-border bg-black/25 pl-11 pr-4 text-sm text-white outline-none transition-colors placeholder:text-white/20 focus:border-purple-500/60" />
+              </div>
+              <div className="relative">
+                <ListFilter className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-wms-muted" size={17} />
+                <select value={auditActionFilter} onChange={event => setAuditActionFilter(event.target.value)} className="min-h-12 w-full appearance-none rounded-xl border border-wms-border bg-black/25 pl-11 pr-10 text-xs font-bold uppercase text-white outline-none focus:border-purple-500/60">
+                  <option value="ALL">Todas las acciones</option>
+                  {auditActions.map(action => <option key={action} value={action}>{getActionLabel(action)}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-wms-muted" size={16} />
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar sm:p-4">
+              <div className="space-y-2">
+                {filteredAuditLogs.map((log: any) => {
+                  const metadata = metadataOf(log);
+                  const isExpanded = expandedAuditId === log.id;
+                  return (
+                    <article key={log.id} className="group overflow-hidden rounded-2xl border border-white/[0.07] bg-black/20 transition-all hover:border-purple-500/25 hover:bg-purple-500/[0.035]">
+                      <button type="button" onClick={() => setExpandedAuditId(isExpanded ? null : log.id)} className="grid w-full gap-4 p-4 text-left sm:grid-cols-[10rem_12rem_1fr_auto] sm:items-center sm:p-5">
+                        <div>
+                          <p className="flex items-center gap-2 font-mono text-[11px] font-bold text-white"><Clock size={13} className="text-purple-300" /> {new Date(log.timestamp).toLocaleDateString([], { day: '2-digit', month: 'short', year: '2-digit' })}</p>
+                          <p className="mt-1 pl-5 font-mono text-[10px] text-wms-muted">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
                         </div>
-                      </td>
-                      <td className="p-5 whitespace-nowrap">
-                        <span className="inline-flex items-center font-mono font-bold text-xs px-2.5 py-1 rounded-lg bg-wms-card border border-wms-border/70 text-white tracking-tight shadow-sm">
-                          {log.userId}
-                        </span>
-                      </td>
-                      <td className="p-5 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${getActionStyle(log.action)}`}>
-                          {getActionLabel(log.action)}
-                        </span>
-                      </td>
-                      <td className="p-5 text-xs text-white/90 group-hover:text-white transition-colors leading-relaxed font-medium">
-                        {formatMetadata(log)}
-                      </td>
-                    </tr>
-                  ))}
-                  {auditLogs.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="text-center py-10 text-white/10 text-xs font-black uppercase tracking-[0.5em]">
-                        Sin logs registrados
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                        <div className="flex min-w-0 items-center gap-2"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/5 text-wms-muted"><UserRound size={14} /></div><span className="truncate font-mono text-xs font-bold text-white/85">{log.userId}</span></div>
+                        <div className="min-w-0">
+                          <span className={`inline-flex rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${getActionStyle(log.action)}`}>{getActionLabel(log.action)}</span>
+                          <p className="mt-2 text-xs leading-5 text-white/65 sm:text-sm">{formatMetadata(log)}</p>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-widest text-wms-muted sm:justify-end"><span className="sm:hidden">Detalle técnico</span>{isExpanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}</div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t border-white/5 bg-black/25 px-4 py-4 sm:ml-[22rem] sm:px-5">
+                          <p className="mb-3 text-[9px] font-black uppercase tracking-[0.2em] text-wms-muted">Datos del evento</p>
+                          {Object.keys(metadata).length ? (
+                            <div className="grid gap-2 md:grid-cols-2">
+                              {Object.entries(metadata).map(([key, value]) => (
+                                <div key={key} className="min-w-0 rounded-xl border border-white/5 bg-white/[0.025] p-3">
+                                  <p className="text-[8px] font-black uppercase tracking-widest text-purple-300/70">{key.replace(/([A-Z])/g, ' $1').replaceAll('_', ' ')}</p>
+                                  <p className="mt-1 break-all font-mono text-[10px] leading-5 text-white/70">{Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : <p className="text-xs text-wms-muted">Este evento no contiene datos adicionales.</p>}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+
+                {filteredAuditLogs.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-16 text-center"><TriangleAlert size={34} className="mb-3 text-purple-300/40" /><p className="font-black uppercase tracking-wider text-white/70">Sin resultados</p><p className="mt-1 text-sm text-wms-muted">Prueba cambiando el filtro o la búsqueda.</p></div>
+                )}
+              </div>
             </div>
           </div>
         </section>
