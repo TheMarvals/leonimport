@@ -267,6 +267,17 @@ export default function PackingPage() {
 
   const completePacking = async () => {
     if (!activeOrder || !selectedStation) return;
+    const primaryMlId = activeOrder.mlId.split(' + ')[0];
+    const labelUrl = `/api/packing/label/${primaryMlId}`;
+
+    // Debe abrirse durante el clic del usuario. Si esperamos la respuesta del
+    // servidor, Chrome considera la pestaña un popup y puede bloquearla.
+    const printTab = window.open('about:blank', '_blank');
+    if (printTab) {
+      printTab.document.title = 'Preparando etiqueta...';
+      printTab.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Preparando etiqueta de MercadoLibre...</p>';
+    }
+
     let res;
     try {
       res = await fetch('/api/packing', {
@@ -280,18 +291,26 @@ export default function PackingPage() {
         })
       });
     } catch (err) {
+      printTab?.close();
       console.error('Error al completar packing:', err);
       showToast('Error de conexión al despachar la orden.', 'error');
       return;
     }
+    if (!res.ok) {
+      printTab?.close();
+      const error = await res.json().catch(() => ({}));
+      showToast(error.error || 'No se pudo completar el despacho.', 'error');
+      return;
+    }
+
     if (res.ok) {
       // 1. Cerrar packing y mostrar loader de impresión
       setIsPrinting(true);
 
-      const primaryMlId = activeOrder.mlId.split(' + ')[0];
-
-      // Abrir pestaña de inmediato para evitar bloqueo de popup por seguridad del navegador
-      const printTab = window.open(`/api/packing/label/${primaryMlId}`, '_blank');
+      // Cargar el PDF en la pestaña que ya fue autorizada por el navegador.
+      if (printTab && !printTab.closed) {
+        printTab.location.href = labelUrl;
+      }
 
       const finalize = () => {
         setIsPrinting(false);
@@ -315,13 +334,20 @@ export default function PackingPage() {
           }
           finalize();
         } else {
-          // Si falló la impresión directa, la pestaña ya se abrió con el PDF, así que solo avisamos
-          console.warn('[Packing] Impresión directa falló, usando pestaña de fallback.');
+          const printError = await printRes.json().catch(() => ({}));
+          console.warn('[Packing] Impresión directa falló:', printError.error || printRes.statusText);
+          if (!printTab) {
+            showModalAlert('Impresión manual requerida', 'El navegador bloqueó la pestaña. Habilita ventanas emergentes para wms.leonexpress.cl y usa Reimprimir desde el historial.', 'warning');
+          } else {
+            showToast('Etiqueta abierta para impresión manual.', 'info');
+          }
           finalize();
         }
       } catch (err) {
         console.error('Error en impresión automática:', err);
-        // Si falló, la pestaña ya está abierta mostrando el PDF
+        if (!printTab) {
+          showModalAlert('Impresión manual requerida', 'Habilita ventanas emergentes para wms.leonexpress.cl y usa Reimprimir desde el historial.', 'warning');
+        }
         finalize();
       }
     }

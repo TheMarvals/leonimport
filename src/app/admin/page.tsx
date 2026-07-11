@@ -444,33 +444,33 @@ export default function AdminPage() {
       </header>
 
       {/* ─── TABS ─── */}
-      <div className="hide-scrollbar mb-6 flex w-full gap-2 overflow-x-auto pb-1 md:mb-8 md:gap-4">
+      <div className="mb-6 grid w-full grid-cols-2 gap-2 sm:grid-cols-3 md:mb-8 lg:flex lg:flex-wrap lg:gap-4">
         <button onClick={() => setTab('users')}
-          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+          className={`justify-center shrink-0 px-3 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
             tab === 'users' ? 'bg-leon-red text-white shadow-lg shadow-leon-red/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
           }`}>
           <Users size={16} className="md:w-[18px] md:h-[18px]" /> USUARIOS ({users.length})
         </button>
         <button onClick={() => setTab('ml-missing')}
-          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+          className={`justify-center shrink-0 px-3 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
             tab === 'ml-missing' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
           }`}>
           <AlertCircle size={16} className="md:w-[18px] md:h-[18px]" /> ML-MISSING ({ghostGroups.length})
         </button>
         <button onClick={() => setTab('cubicles')}
-          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+          className={`justify-center shrink-0 px-3 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
             tab === 'cubicles' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
           }`}>
           <Grid3X3 size={16} className="md:w-[18px] md:h-[18px]" /> CUBÍCULOS ({cubicles.length})
         </button>
         <button onClick={() => setTab('duplicates')}
-          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+          className={`justify-center shrink-0 px-3 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
             tab === 'duplicates' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
           }`}>
-          <GitMerge size={16} className="md:w-[18px] md:h-[18px]" /> DUPLICADOS
+          <GitMerge size={16} className="md:w-[18px] md:h-[18px]" /> MERGE PRODUCTOS
         </button>
         <Link href="/admin/sync"
-          className="shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30 transition-all">
+          className="justify-center shrink-0 px-3 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30 transition-all">
           <Activity size={16} className="md:w-[18px] md:h-[18px]" /> SYNC
         </Link>
       </div>

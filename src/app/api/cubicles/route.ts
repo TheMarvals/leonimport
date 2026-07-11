@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const includeInactive = req.nextUrl.searchParams.get('all') === 'true' && session.role === 'ADMIN';
+  const includeInactive = req.nextUrl.searchParams.get('all') === 'true' && ['SUPERVISOR', 'ADMIN'].includes(session.role);
   const cubicles = await prisma.cubicle.findMany({
     where: includeInactive ? undefined : { isActive: true },
     orderBy: { number: 'asc' },
@@ -40,8 +40,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session.isLoggedIn || session.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+  if (!session.isLoggedIn || !['SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    return NextResponse.json({ error: 'Solo supervisores' }, { status: 403 });
   }
 
   const body = await req.json();
@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const session = await getSession();
-  if (!session.isLoggedIn || session.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+  if (!session.isLoggedIn || !['SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    return NextResponse.json({ error: 'Solo supervisores' }, { status: 403 });
   }
 
   const body = await req.json();
@@ -98,8 +98,8 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
-  if (!session.isLoggedIn || session.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+  if (!session.isLoggedIn || !['SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    return NextResponse.json({ error: 'Solo supervisores' }, { status: 403 });
   }
 
   const body = await req.json();

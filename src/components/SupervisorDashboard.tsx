@@ -9,7 +9,6 @@ import {
   History as HistoryIcon, 
   Activity, 
   ArrowLeft, 
-  Shield,
   Search,
   Package,
   Printer,
@@ -21,12 +20,17 @@ import {
   Camera,
   Hand,
   Shuffle,
-  Grid3X3
+  Grid3X3,
+  GitMerge,
+  Users
 } from 'lucide-react';
 import { getHighResImageUrl } from '@/lib/image-utils';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
+import CubicleManager from '@/components/CubicleManager';
+import ProductMergeManager from '@/components/ProductMergeManager';
+import UserManager from '@/components/UserManager';
 
-type Tab = 'ml-missing' | 'conflicts' | 'history' | 'audit';
+type Tab = 'ml-missing' | 'conflicts' | 'history' | 'audit' | 'cubicles' | 'merge' | 'users';
 
 interface ConflictItem {
   id: string;
@@ -446,14 +450,7 @@ export const SupervisorDashboard = () => {
             <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-black">Warehouse Management System</p>
           </div>
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3 md:w-auto">
-          <Link 
-            href="/admin" 
-            className="flex items-center justify-center gap-2 rounded-xl border border-wms-border bg-wms-card px-3 py-2.5 text-xs font-bold tracking-wide text-white/90 shadow-sm transition-all hover:border-leon-red/50 hover:bg-leon-red/10 sm:rounded-2xl sm:px-5"
-          >
-            <Shield size={13} strokeWidth={3} className="text-leon-red-light" /> PERSONAL
-          </Link>
-
+        <div className="flex w-full items-center sm:w-auto">
           <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/5 px-3 py-2.5 shadow-sm sm:rounded-2xl sm:px-4">
             <Activity size={13} className="text-emerald-500 animate-pulse" strokeWidth={3} />
             <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">Live OK</span>
@@ -462,9 +459,9 @@ export const SupervisorDashboard = () => {
       </header>
 
       {/* ─── TABS ─── */}
-      <div className="flex gap-2 p-1.5 bg-wms-card border border-wms-border/60 rounded-2xl mb-6 flex-shrink-0 w-full overflow-x-auto shadow-lg hide-scrollbar">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-wms-border/60 bg-wms-card p-1.5 shadow-lg sm:grid-cols-3 lg:flex lg:flex-wrap mb-6 flex-shrink-0 w-full">
         <button onClick={() => setActiveTab('ml-missing')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'ml-missing'
               ? 'bg-amber-500/10 border border-amber-500/35 text-amber-400 font-black shadow-inner'
               : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
@@ -472,7 +469,7 @@ export const SupervisorDashboard = () => {
           <AlertCircle size={15} /> ML-MISSING ({ghostGroups.length})
         </button>
         <button onClick={() => setActiveTab('conflicts')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'conflicts'
               ? 'bg-leon-red/10 border border-leon-red/35 text-leon-red-light font-black shadow-inner'
               : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
@@ -480,7 +477,7 @@ export const SupervisorDashboard = () => {
           <ShieldAlert size={15} /> CONFLICTOS ({conflicts.length})
         </button>
         <button onClick={() => setActiveTab('history')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'history'
               ? 'bg-blue-500/10 border border-blue-500/35 text-blue-400 font-black shadow-inner'
               : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
@@ -488,14 +485,44 @@ export const SupervisorDashboard = () => {
           <HistoryIcon size={15} /> HISTORIAL ({shippedHistory.length})
         </button>
         <button onClick={() => setActiveTab('audit')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'audit'
               ? 'bg-purple-500/10 border border-purple-500/35 text-purple-400 font-black shadow-inner'
               : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
           }`}>
           <Activity size={15} /> AUDITORÍA ({auditLogs.length})
         </button>
+        <button onClick={() => setActiveTab('cubicles')}
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'cubicles'
+              ? 'bg-blue-500/10 border border-blue-500/35 text-blue-400 font-black shadow-inner'
+              : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
+          }`}>
+          <Grid3X3 size={15} /> CUBÍCULOS
+        </button>
+        <button onClick={() => setActiveTab('merge')}
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'merge'
+              ? 'bg-fuchsia-500/10 border border-fuchsia-500/35 text-fuchsia-400 font-black shadow-inner'
+              : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
+          }`}>
+          <GitMerge size={15} /> MERGE PRODUCTOS
+        </button>
+        <button onClick={() => setActiveTab('users')}
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'users'
+              ? 'bg-emerald-500/10 border border-emerald-500/35 text-emerald-400 font-black shadow-inner'
+              : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
+          }`}>
+          <Users size={15} /> USUARIOS
+        </button>
       </div>
+
+      {activeTab === 'cubicles' && <CubicleManager />}
+
+      {activeTab === 'merge' && <ProductMergeManager />}
+
+      {activeTab === 'users' && <UserManager />}
 
       {/* ═══════════════════════════════════ */}
       {/* TAB: ML-MISSING */}

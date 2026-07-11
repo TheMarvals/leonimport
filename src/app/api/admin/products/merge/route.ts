@@ -24,8 +24,8 @@ function summarizeProduct(product: any, score?: number) {
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session.isLoggedIn || session.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+  if (!session.isLoggedIn || !['SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    return NextResponse.json({ error: 'Solo supervisores' }, { status: 403 });
   }
 
   const query = req.nextUrl.searchParams.get('q')?.trim();
@@ -86,8 +86,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session.isLoggedIn || session.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+  if (!session.isLoggedIn || !['SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    return NextResponse.json({ error: 'Solo supervisores' }, { status: 403 });
   }
 
   const { sourceProductId, targetProductId } = await req.json();
