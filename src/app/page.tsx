@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { redirect } from 'next/navigation';
+import Navbar from '@/components/Navbar';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,22 +55,12 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-wms-bg flex flex-col">
-      <div className="leon-brand-bar" />
-
-      {/* User Bar */}
-      <div className="flex items-center justify-between gap-3 border-b border-wms-border bg-wms-surface px-4 py-3 md:px-8">
-        <p className="min-w-0 text-xs text-wms-muted sm:text-sm">
-          <span className="hidden sm:inline">Operario: </span><span className="font-bold text-white">{session.name}</span>
-          <span className="ml-2 inline-block rounded bg-leon-red/20 px-2 py-0.5 text-[10px] font-bold text-leon-red sm:ml-3 sm:text-xs">
-            {session.role}
-          </span>
-        </p>
-        <form action="/api/auth/logout" method="POST">
-          <button type="submit" className="flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs text-wms-muted transition-colors hover:bg-red-500/10 hover:text-red-400 sm:text-sm">
-            <LogOut size={16} /> <span className="hidden sm:inline">Cerrar Sesión</span><span className="sm:hidden">Salir</span>
-          </button>
-        </form>
-      </div>
+      <Navbar 
+        title="LEÓN IMPORT" 
+        subtitle="Gestión de Almacén" 
+        showSession={true} 
+        session={{ name: session.name || '', role: session.role }} 
+      />
 
       <div className="flex-1 flex items-center justify-center p-4 md:p-8">
         <div className="max-w-4xl w-full space-y-8 md:space-y-12">

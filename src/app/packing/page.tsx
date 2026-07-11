@@ -3,11 +3,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Box, CheckCircle, Search, Printer, Scan, ChevronRight, Camera, AlertTriangle, Grid3X3 } from 'lucide-react';
+import { ArrowLeft, Box, CheckCircle, Search, Printer, Scan, ChevronRight, Camera, AlertTriangle, Grid3X3, RefreshCw } from 'lucide-react';
 import { getHighResImageUrl } from '@/lib/image-utils';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { usePhysicalScanner } from '@/hooks/usePhysicalScanner';
+import Navbar from '@/components/Navbar';
 
 interface Product {
   id: string;
@@ -137,6 +138,34 @@ export default function PackingPage() {
       setSelectedStation(stationData.activeStation);
     }
   }, [stationData, selectedStation]);
+
+  // Si hay una orden que ya está bloqueada por mí (WMS backend la filtra por session.userId), reanudarla al cargar
+  useEffect(() => {
+    if (!activeOrder && groupedOrdersList.length > 0) {
+      const lockedOrder = groupedOrdersList.find(o => o.lockedBy !== null && o.lockedBy !== undefined);
+      if (lockedOrder) {
+        setActiveOrder(lockedOrder);
+        // Inicializar cantidades empacadas (empezamos de 0 en el conteo local para seguridad)
+        const initialCounts: Record<string, number> = {};
+        lockedOrder.items.forEach(i => initialCounts[i.id] = 0);
+        setPackedQuantities(initialCounts);
+        setPackingMethods([]);
+      }
+    }
+  }, [groupedOrdersList, activeOrder]);
+
+  // Advertir al usuario antes de recargar la página si tiene un empaque en progreso
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (activeOrder) {
+        e.preventDefault();
+        e.returnValue = 'Tienes un empaque en progreso en esta mesa. ¿Estás seguro de que deseas salir? Perderás el avance del escaneo actual de la caja.';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [activeOrder]);
 
   const stations = stationData?.details ?? [];
 
@@ -463,7 +492,7 @@ export default function PackingPage() {
             >
               <ArrowLeft size={16} /> Volver al Inicio
             </Link>
-          </div>
+              </div>
         </div>
         <p className="text-center text-wms-muted/20 text-xs py-6">León Import WMS • Control de Estaciones</p>
       </div>
@@ -474,38 +503,35 @@ export default function PackingPage() {
   if (!activeOrder) {
     return (
       <div className="min-h-screen bg-wms-bg text-wms-text font-sans">
-        <div className="leon-brand-bar" />
-        <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="p-2.5 bg-wms-surface border border-wms-border hover:border-leon-red/50 text-wms-muted hover:text-white rounded-full hover:bg-leon-red/10 transition-all shadow-sm shrink-0">
-                <ArrowLeft size={20} strokeWidth={3} />
-              </Link>
-              <h1 className="text-2xl md:text-3xl font-black text-white truncate">
-                ZONA DE <span className="text-leon-red">PACKING</span>
-              </h1>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              <div className="flex-1 sm:flex-none bg-leon-red/10 border border-leon-red/20 px-4 py-2.5 rounded-xl flex items-center justify-between sm:justify-start gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="w-2 bg-leon-red h-2 rounded-full animate-ping" />
-                  <span className="text-xs font-black text-leon-red-light uppercase tracking-tight">{selectedStation}</span>
-                </div>
+        <Navbar 
+          title="ZONA DE PACKING" 
+          subtitle="Órdenes listas para empaque" 
+          backHref="/"
+          rightContent={
+            <div className="flex items-center gap-2">
+              <div className="bg-leon-red/10 border border-leon-red/20 px-2.5 py-1 rounded-xl flex items-center gap-2 shrink-0">
+                <span className="w-1.5 bg-leon-red h-1.5 rounded-full animate-ping hidden xs:inline" />
+                <span className="text-[10px] font-black text-leon-red-light uppercase tracking-tight">{selectedStation}</span>
                 <button 
                   onClick={releaseStation}
-                  className="text-wms-muted hover:text-leon-red text-xs font-bold transition-colors uppercase tracking-wide border-l border-leon-red/20 pl-3"
+                  className="text-wms-muted hover:text-leon-red text-[10px] font-bold transition-colors uppercase tracking-wide border-l border-leon-red/20 pl-2 ml-1"
                 >
                   Liberar
                 </button>
               </div>
 
-              <button onClick={fetchOrders} className="flex-1 sm:flex-none bg-wms-surface hover:bg-white/5 border border-wms-border text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all">
-                <Search size={16} /> Actualizar
+              <button 
+                onClick={fetchOrders} 
+                className="bg-wms-bg hover:bg-white/5 border border-wms-border text-white p-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                title="Actualizar lista de órdenes"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">Actualizar</span>
               </button>
             </div>
-          </div>
-
+          }
+        />
+        <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {groupedOrdersList
               .sort((a, b) => {
@@ -576,28 +602,29 @@ export default function PackingPage() {
 
   return (
     <div className="flex min-h-screen min-h-[100svh] flex-col bg-wms-bg font-sans text-wms-text">
-      <div className="leon-brand-bar" />
-      
-      {/* Header Packing */}
-      <div className="bg-wms-surface border-b border-wms-border p-3 md:p-4 flex items-center justify-between sticky top-0 z-10 shadow-2xl">
-        <div className="min-w-0">
-          <h2 className="text-xs md:text-lg font-black text-wms-muted uppercase tracking-widest leading-none mb-1">Auditoría de Orden</h2>
-          <p className="text-leon-red font-black text-lg md:text-xl italic tracking-tighter truncate">ML-{activeOrder.mlId}</p>
-          <p className="mt-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-400"><Grid3X3 size={11} /> Retirada del cubículo {activeOrder.cubicleNumber ?? activeOrder.cubicle?.number ?? '—'}</p>
-        </div>
-        <div className="flex items-center gap-2 md:gap-4 shrink-0">
-          <button 
-            onClick={cancelPacking}
-            className="text-wms-muted hover:text-leon-red text-[9px] md:text-xs font-black uppercase transition-colors px-3 py-2 border border-wms-border hover:border-leon-red/30 rounded-lg md:rounded-xl">
-            Cancelar
-          </button>
-          {isOrderFullyPacked && (
-            <button onClick={completePacking} className="bg-green-600 hover:bg-green-500 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg md:rounded-xl font-black text-xs md:text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-600/20 uppercase tracking-widest">
-              <Printer size={16} /> <span className="hidden md:inline">Despachar</span><span className="md:hidden">Fin</span>
-            </button>
-          )}
-        </div>
-      </div>
+      <Navbar 
+        title={`ML-${activeOrder.mlId}`} 
+        subtitle={`Empaque en progreso · Cubículo ${activeOrder.cubicleNumber ?? activeOrder.cubicle?.number ?? '—'}`}
+        onBackClick={cancelPacking}
+        rightContent={
+          <div className="flex items-center gap-2">
+            <div className="bg-leon-red/10 border border-leon-red/20 px-2.5 py-1 rounded-xl flex items-center gap-2 shrink-0">
+              <span className="w-1.5 bg-leon-red h-1.5 rounded-full animate-ping hidden xs:inline" />
+              <span className="text-[10px] font-black text-leon-red-light uppercase tracking-tight">{selectedStation}</span>
+            </div>
+            
+            {isOrderFullyPacked && (
+              <button 
+                onClick={completePacking} 
+                className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-xl font-black text-[10px] sm:text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-lg shadow-green-600/20 uppercase tracking-wider shrink-0"
+              >
+                <Printer size={13} />
+                <span>Despachar</span>
+              </button>
+            )}
+          </div>
+        }
+      />
 
       {/* Main Content: Layout de dos columnas para Imagen Grande e Ítems */}
       <div className="relative flex flex-1 flex-col overflow-visible p-3 lg:overflow-hidden md:p-8">

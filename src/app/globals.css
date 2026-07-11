@@ -29,6 +29,7 @@ body {
   background-color: var(--wms-bg);
   color: var(--wms-text);
   font-family: 'Inter', system-ui, sans-serif;
+  overscroll-behavior-y: contain;
 }
 
 /* Fondo de acceso con profundidad sutil, sin distraer del formulario. */

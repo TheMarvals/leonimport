@@ -10,6 +10,7 @@ import BarcodeScanner from '@/components/BarcodeScanner';
 import { usePhysicalScanner } from '@/hooks/usePhysicalScanner';
 import Image from 'next/image';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import Navbar from '@/components/Navbar';
 
 interface Location {
   id: string;
@@ -221,6 +222,19 @@ export default function PickingPage() {
       }
     }
   }, [groupedOrdersList, activeOrder, getResumeItemIndex]);
+
+  // Advertir al usuario antes de recargar la página si está en medio de un picking
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (activeOrder) {
+        e.preventDefault();
+        e.returnValue = 'Tienes un picking activo en progreso. ¿Estás seguro de que deseas salir? El progreso local no confirmado se perderá.';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [activeOrder]);
 
   // Timer para el cooldown de sincronización
   // Mutación: sincronización con ML
@@ -580,18 +594,9 @@ export default function PickingPage() {
   if (!activeOrder) {
     return (
       <div className="min-h-screen bg-wms-bg text-wms-text font-sans">
-        <div className="leon-brand-bar" />
+        <Navbar title="Picking León" subtitle="Órdenes pendientes de recolección" backHref="/" />
         <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="p-2.5 bg-wms-card border border-wms-border hover:border-leon-red/50 text-wms-muted hover:text-white rounded-full hover:bg-leon-red/10 transition-all shadow-sm shrink-0">
-                <ArrowLeft size={20} strokeWidth={3} />
-              </Link>
-              <h1 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic truncate">
-                Picking <span className="text-leon-red drop-shadow-[0_0_12px_rgba(155,27,48,0.3)]">León</span>
-              </h1>
-            </div>
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 w-full">
               <div className="relative w-full sm:w-auto flex-1 sm:flex-initial">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-wms-muted" size={14} />
                 <input
@@ -618,8 +623,7 @@ export default function PickingPage() {
                 <RefreshCw size={16} className={ordersLoading ? 'animate-spin' : ''} />
               </button>
             </div>
-          </div>
-
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredOrders.length === 0 ? (
               <div className="col-span-full py-20 text-center text-wms-muted bg-wms-card border border-wms-border/60 rounded-[2rem] border-dashed">
@@ -767,34 +771,18 @@ export default function PickingPage() {
       
       {/* Grupo Sticky Superior (Header + Banner) */}
       <div className="sticky top-0 z-40 flex flex-col shadow-2xl">
-        {/* Header Picking */}
-        <div className="bg-wms-surface border-b border-wms-border px-2.5 py-3 md:p-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 md:gap-4 min-w-0">
-            <div className="bg-leon-red text-white w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-base md:text-xl shadow-lg shadow-leon-red/20 rotate-3 shrink-0">
-              {currentItemIndex + 1}
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm md:text-xl font-black text-white leading-none truncate" title={`Pack: ML-${activeOrder.mlId}`}>
-                <span>ML-{activeOrder.mlId}</span>
-                {activeOrder.shippingId && <span className="block text-[8px] sm:text-[9px] font-mono font-normal text-wms-muted truncate mt-0.5">{activeOrder.shippingId}</span>}
-              </h2>
-              <p className="text-wms-muted text-[8px] sm:text-[9px] md:text-[10px] font-bold uppercase mt-1 tracking-widest truncate">Prod. {currentItemIndex + 1} de {groupedItems.length}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-            <button 
-              onClick={cancelPicking}
-              title="Salir y reiniciar la recolección"
-              className="text-wms-muted hover:text-leon-red text-[9px] md:text-[10px] font-black uppercase transition-colors px-2.5 py-2 md:px-4 md:py-2 border border-wms-border hover:border-leon-red/30 rounded-lg md:rounded-xl">
-              Salir
-            </button>
-            {isOrderComplete && (
-              <span className="hidden sm:inline-flex rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[9px] md:text-xs font-black uppercase tracking-wider text-amber-400">
-                Asignar cubículo
+        <Navbar 
+          title={`ML-${activeOrder.mlId}`} 
+          subtitle={`Producto ${currentItemIndex + 1} de ${groupedItems.length}`}
+          onBackClick={cancelPicking}
+          rightContent={
+            isOrderComplete ? (
+              <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-amber-400 shrink-0">
+                CUBÍCULO
               </span>
-            )}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
 
         {/* Banner de Instrucción de Despacho (Shipping Note) */}
         {activeOrder.priorityMessage && (
