@@ -73,3 +73,25 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  const session = await getSession();
+  if (session.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  try {
+    const { id } = await req.json();
+    if (!id) return NextResponse.json({ error: 'Falta ID de usuario' }, { status: 400 });
+
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true, message: 'Usuario eliminado correctamente' });
+  } catch (error: any) {
+    console.error('Error eliminando usuario:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+

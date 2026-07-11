@@ -192,6 +192,34 @@ export default function AdminPage() {
     setIsNew(true);
   };
 
+  const deleteUser = async (user: any) => {
+    const confirmation = await showConfirmModal(
+      `¿Eliminar permanentemente a ${user.name}?`,
+      'Esta acción no se puede deshacer y podría afectar el historial si el usuario realizó tareas registradas.',
+      'Sí, eliminar de todos modos'
+    );
+    if (!confirmation.isConfirmed) return;
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.id })
+      });
+      
+      if (res.ok) {
+        fetchUsers();
+        showToast('Usuario eliminado correctamente.', 'info');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || 'Error al eliminar usuario', 'error');
+      }
+    } catch (err) {
+      console.error('Error al eliminar usuario:', err);
+      showToast('Error de conexión al eliminar usuario.', 'error');
+    }
+  };
+
   // ─── Resolution functions ───
   const handleModalSearch = async (term: string) => {
     setModalSearchTerm(term);
@@ -466,8 +494,16 @@ export default function AdminPage() {
                   <div className="bg-wms-bg p-3 rounded-2xl">
                     <Shield size={24} className={user.role === 'ADMIN' ? 'text-leon-red' : 'text-wms-muted'} />
                   </div>
-                  <button onClick={() => { setEditingUser(user); setIsNew(false); }}
-                    className="text-xs font-black uppercase text-leon-red hover:underline">Editar</button>
+                  <div className="flex gap-3">
+                    <button onClick={() => { setEditingUser(user); setIsNew(false); }}
+                      className="text-xs font-black uppercase text-amber-500 hover:text-amber-400 transition-colors">
+                      Editar
+                    </button>
+                    <button onClick={() => deleteUser(user)}
+                      className="text-xs font-black uppercase text-leon-red-light hover:text-leon-red transition-colors flex items-center gap-0.5">
+                      <Trash2 size={12} /> Eliminar
+                    </button>
+                  </div>
                 </div>
                 <h3 className="text-xl font-bold mb-1">{user.name}</h3>
                 <p className="text-leon-red text-xs font-black uppercase tracking-widest mb-4">{user.role}</p>
@@ -721,6 +757,17 @@ export default function AdminPage() {
               <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:gap-4 sm:pt-4">
                 <button type="button" onClick={() => setEditingUser(null)}
                   className="flex-1 bg-wms-bg text-wms-muted py-4 rounded-xl font-bold hover:text-white transition-colors">CANCELAR</button>
+                {!isNew && (
+                  <button type="button" 
+                    onClick={() => {
+                      const userToDel = {...editingUser};
+                      setEditingUser(null);
+                      deleteUser(userToDel);
+                    }}
+                    className="flex-1 bg-leon-red/10 border border-leon-red/30 text-leon-red hover:bg-leon-red hover:text-white py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                    <Trash2 size={16} /> ELIMINAR
+                  </button>
+                )}
                 <button type="submit"
                   className="flex-1 bg-leon-red text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-red-600 transition-colors">
                   <Save size={18} /> GUARDAR
