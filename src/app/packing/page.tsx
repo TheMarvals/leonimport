@@ -355,11 +355,11 @@ export default function PackingPage() {
   // Si no se ha seleccionado mesa, obligar a seleccionar una de las 6 mesas
   if (!selectedStation) {
     return (
-      <div className="min-h-screen bg-wms-bg text-wms-text font-sans flex flex-col justify-between">
+      <div className="flex min-h-screen min-h-[100svh] flex-col justify-between bg-wms-bg font-sans text-wms-text">
         <div className="leon-brand-bar" />
-        <div className="max-w-4xl w-full mx-auto p-6 md:p-12 my-auto space-y-10">
+        <div className="mx-auto my-auto w-full max-w-4xl space-y-7 p-4 sm:p-6 md:space-y-10 md:p-12">
           <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white uppercase">
+            <h1 className="text-3xl font-black uppercase tracking-tight text-white sm:text-4xl md:text-5xl">
               SELECCIÓN DE <span className="text-leon-red">MESA DE TRABAJO</span>
             </h1>
             <p className="text-wms-muted max-w-xl mx-auto text-sm md:text-base leading-relaxed">
@@ -372,7 +372,7 @@ export default function PackingPage() {
               Consultando estado de las mesas en tiempo real...
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3">
               {stations.map((st: any) => {
                 const isLockedByOthers = st.isLocked && !st.isMine;
                 return (
@@ -380,7 +380,7 @@ export default function PackingPage() {
                     key={st.name}
                     disabled={isLockedByOthers}
                     onClick={() => selectStation(st.name)}
-                    className={`relative rounded-3xl p-6 text-left transition-all border group flex flex-col justify-between h-48 overflow-hidden active:scale-95 ${
+                    className={`relative h-40 overflow-hidden rounded-2xl border p-5 text-left transition-all group flex flex-col justify-between active:scale-95 sm:h-48 sm:rounded-3xl sm:p-6 ${
                       isLockedByOthers
                         ? 'bg-wms-surface/30 border-wms-border opacity-50 cursor-not-allowed'
                         : 'bg-wms-surface border-wms-border hover:border-leon-red/50 shadow-lg hover:shadow-[0_0_30px_rgba(155,27,48,0.15)] cursor-pointer'
@@ -441,7 +441,7 @@ export default function PackingPage() {
     return (
       <div className="min-h-screen bg-wms-bg text-wms-text font-sans">
         <div className="leon-brand-bar" />
-        <div className="max-w-5xl mx-auto p-6 space-y-6">
+        <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
             <div className="flex items-center gap-4">
               <Link href="/" className="p-2.5 bg-wms-surface border border-wms-border hover:border-leon-red/50 text-wms-muted hover:text-white rounded-full hover:bg-leon-red/10 transition-all shadow-sm shrink-0">
@@ -491,7 +491,7 @@ export default function PackingPage() {
                 return 0;
               })
               .map(o => (
-              <div key={o.id} className={`bg-wms-surface border p-6 rounded-2xl flex flex-col justify-between gap-6 hover:border-leon-red/50 transition-colors relative overflow-hidden ${o.isFlex ? 'border-leon-red/50 bg-leon-red/5' : 'border-wms-border'}`}>
+              <div key={o.id} className={`bg-wms-surface border p-4 sm:p-6 rounded-2xl flex flex-col justify-between gap-5 sm:gap-6 hover:border-leon-red/50 transition-colors relative overflow-hidden ${o.isFlex ? 'border-leon-red/50 bg-leon-red/5' : 'border-wms-border'}`}>
                 {o.isFlex && (
                    <div className="absolute top-0 right-0">
                     <div className="bg-leon-red text-white text-[8px] font-black px-3 py-0.5 uppercase tracking-widest rounded-bl-lg shadow-lg">
@@ -534,7 +534,7 @@ export default function PackingPage() {
   const isOrderFullyPacked = activeOrder.items.every(i => packedQuantities[i.id] === i.quantityPicked);
 
   return (
-    <div className="min-h-screen bg-wms-bg text-wms-text font-sans flex flex-col">
+    <div className="flex min-h-screen min-h-[100svh] flex-col bg-wms-bg font-sans text-wms-text">
       <div className="leon-brand-bar" />
       
       {/* Header Packing */}
@@ -558,7 +558,7 @@ export default function PackingPage() {
       </div>
 
       {/* Main Content: Layout de dos columnas para Imagen Grande e Ítems */}
-      <div className="flex-1 p-3 md:p-8 flex flex-col relative overflow-hidden">
+      <div className="relative flex flex-1 flex-col overflow-visible p-3 lg:overflow-hidden md:p-8">
 
 
         {/* Toast de Error de Escaneo */}
@@ -569,14 +569,14 @@ export default function PackingPage() {
           </div>
         )}
 
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-wms-surface border border-wms-border rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl">
+        <div className="flex flex-1 flex-col overflow-visible rounded-[1.5rem] border border-wms-border bg-wms-surface shadow-2xl lg:flex-row lg:overflow-hidden md:rounded-[2.5rem]">
 
         
         {/* PANEL IZQUIERDO: Imagen Grande (Confirmación Visual) */}
         <div className="w-full lg:w-1/2 bg-black/20 border-b lg:border-b-0 lg:border-r border-wms-border p-4 md:p-6 flex flex-col items-center justify-center space-y-4 md:space-y-6 shrink-0 lg:shrink">
           {(currentItem || lastScannedItem) ? (
             <div className="w-full animate-in fade-in zoom-in duration-300">
-              <div className="aspect-square w-full max-w-[280px] md:max-w-[500px] mx-auto bg-wms-surface rounded-2xl md:rounded-3xl border-2 md:border-4 border-leon-red/30 shadow-[0_0_50px_rgba(155,27,48,0.2)] overflow-hidden flex items-center justify-center relative">
+              <div className="relative mx-auto aspect-square w-full max-w-[220px] overflow-hidden rounded-2xl border-2 border-leon-red/30 bg-wms-surface shadow-[0_0_50px_rgba(155,27,48,0.2)] sm:max-w-[280px] md:max-w-[500px] md:rounded-3xl md:border-4">
                 {(currentItem?.mlImageUrl || currentItem?.product.imageUrl || lastScannedItem?.mlImageUrl || lastScannedItem?.product.imageUrl) ? (
                   <Image src={getHighResImageUrl(currentItem?.mlImageUrl || currentItem?.product.imageUrl || lastScannedItem?.mlImageUrl || lastScannedItem?.product.imageUrl)!} alt="Producto" fill className="object-contain p-2 md:p-4" sizes="(max-width: 768px) 280px, 500px" />
                 ) : (
@@ -619,9 +619,9 @@ export default function PackingPage() {
 
         {/* PANEL DERECHO: Lista de ítems a auditar */}
         <div className="w-full lg:w-1/2 p-4 md:p-8 overflow-y-auto bg-wms-bg">
-          <div className="max-w-2xl mx-auto space-y-6 pb-20">
+          <div className="mx-auto max-w-2xl space-y-5 pb-8 md:space-y-6 md:pb-20">
             
-            <div className="bg-wms-surface border border-wms-border rounded-2xl p-6 mb-8 space-y-4">
+            <div className="mb-6 space-y-4 rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-6 md:mb-8">
               <div className="flex items-center gap-4">
                 <div className="bg-leon-red/10 text-leon-red p-3 rounded-xl">
                   <Scan size={32} />

@@ -31,6 +31,25 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
 }
 
+/* Fondo de acceso con profundidad sutil, sin distraer del formulario. */
+.login-shell {
+  background:
+    radial-gradient(circle at 50% 8%, rgba(155, 27, 48, 0.14), transparent 30rem),
+    linear-gradient(180deg, #0f1117 0%, var(--wms-bg) 58%);
+}
+
+.login-shell::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
+  pointer-events: none;
+  content: '';
+}
+
 /* Botones industriales fat-finger proof (80px mínimo) */
 .btn-industrial {
   min-height: 80px;

@@ -354,7 +354,7 @@ export default function InventarioPage() {
   return (
     <div className="min-h-screen bg-wms-bg text-wms-text font-sans" data-scanner-ignore>
       <div className="leon-brand-bar" />
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6">
 
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
@@ -401,14 +401,14 @@ export default function InventarioPage() {
 
         {/* ─── FORM: PRODUCTO ─── */}
         {showForm && tab === 'products' && (
-          <div className="bg-wms-surface border border-wms-border rounded-2xl p-6 space-y-4">
+          <div className="space-y-4 rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-6">
             <h3 className="text-lg font-bold">Nuevo Producto</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               <input placeholder="Nombre del producto *" value={prodForm.name}
                 onChange={e => { setProdForm({ ...prodForm, name: e.target.value }); setSkuGenerated(false); }}
                 onBlur={autoGenerateSku}
-                className="bg-wms-card border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red col-span-2 md:col-span-3" />
-              <div className="relative col-span-2 md:col-span-1">
+                className="bg-wms-card border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red sm:col-span-2 md:col-span-3" />
+              <div className="relative sm:col-span-2 md:col-span-1">
                 <input placeholder="SKU (automático)" value={prodForm.sku} readOnly
                   className="w-full bg-wms-card/50 border border-wms-border rounded-xl px-4 py-3 text-leon-red font-mono font-bold cursor-not-allowed" />
                 {skuGenerated && (
@@ -416,7 +416,7 @@ export default function InventarioPage() {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               <input placeholder="Marca (opc)" value={prodForm.brand}
                 onChange={e => { setProdForm({ ...prodForm, brand: e.target.value }); setSkuGenerated(false); }}
                 onBlur={autoGenerateSku}
@@ -432,7 +432,7 @@ export default function InventarioPage() {
               <input placeholder="URL Imagen (opc)" value={prodForm.imageUrl} onChange={e => setProdForm({ ...prodForm, imageUrl: e.target.value })}
                 className="bg-wms-card border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red" />
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               <select value={prodForm.supplierId} onChange={e => setProdForm({ ...prodForm, supplierId: e.target.value })}
                 className="bg-wms-card border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red">
                 <option value="">Sin proveedor</option>
@@ -449,7 +449,7 @@ export default function InventarioPage() {
               </select>
             </div>
             <button onClick={() => submit('/api/products', prodForm)} disabled={!prodForm.sku || !prodForm.name || loading}
-              className="bg-leon-red hover:bg-leon-red-light text-white px-8 py-3 rounded-xl font-bold disabled:opacity-40 transition-colors">
+              className="w-full bg-leon-red hover:bg-leon-red-light text-white px-8 py-3 rounded-xl font-bold disabled:opacity-40 transition-colors sm:w-auto">
               {loading ? 'Guardando...' : 'Guardar Producto'}
             </button>
           </div>
@@ -457,9 +457,9 @@ export default function InventarioPage() {
 
         {/* ─── FORM: UBICACIÓN ─── */}
         {showForm && tab === 'locations' && (
-          <div className="bg-wms-surface border border-wms-border rounded-2xl p-6 space-y-4">
+          <div className="space-y-4 rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-6">
             <h3 className="text-lg font-bold">Nueva Ubicación</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               <input placeholder="Pasillo (A,B,C...)" value={locForm.aisle} onChange={e => setLocForm({ ...locForm, aisle: e.target.value.toUpperCase() })}
                 className="bg-wms-card border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red" />
               <input placeholder="Sección" value={locForm.section} onChange={e => setLocForm({ ...locForm, section: e.target.value })}
@@ -470,7 +470,7 @@ export default function InventarioPage() {
                 className="bg-wms-card border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red" />
             </div>
             <button onClick={() => submit('/api/locations', locForm)} disabled={!locForm.aisle || !locForm.section || loading}
-              className="bg-leon-red hover:bg-leon-red-light text-white px-8 py-3 rounded-xl font-bold disabled:opacity-40 transition-colors">
+              className="w-full bg-leon-red hover:bg-leon-red-light text-white px-8 py-3 rounded-xl font-bold disabled:opacity-40 transition-colors sm:w-auto">
               {loading ? 'Guardando...' : 'Guardar Ubicación'}
             </button>
           </div>
@@ -478,7 +478,7 @@ export default function InventarioPage() {
 
         {/* ─── FORM: PROVEEDOR ─── */}
         {showForm && tab === 'suppliers' && (
-          <div className="bg-wms-surface border border-wms-border rounded-2xl p-6 space-y-4">
+          <div className="space-y-4 rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-6">
             <h3 className="text-lg font-bold">Nuevo Proveedor</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <input placeholder="Nombre *" value={supForm.name} onChange={e => setSupForm({ ...supForm, name: e.target.value })}
@@ -491,7 +491,7 @@ export default function InventarioPage() {
                 className="bg-wms-card border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red" />
             </div>
             <button onClick={() => submit('/api/suppliers', supForm)} disabled={!supForm.name || loading}
-              className="bg-leon-red hover:bg-leon-red-light text-white px-8 py-3 rounded-xl font-bold disabled:opacity-40 transition-colors">
+              className="w-full bg-leon-red hover:bg-leon-red-light text-white px-8 py-3 rounded-xl font-bold disabled:opacity-40 transition-colors sm:w-auto">
               {loading ? 'Guardando...' : 'Guardar Proveedor'}
             </button>
           </div>
@@ -507,7 +507,7 @@ export default function InventarioPage() {
             </div>
             
             <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-              className="bg-wms-surface border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red min-w-[200px]">
+              className="w-full bg-wms-surface border border-wms-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-leon-red md:w-auto md:min-w-[200px]">
               <option value="">Todas las categorías</option>
               <option value="1000">Cables y Conexiones</option>
               <option value="2000">Adaptadores y Cargadores</option>
@@ -528,10 +528,10 @@ export default function InventarioPage() {
             </select>
             
             {selected.size > 0 && (
-              <div className="flex gap-2">
+              <div className="flex w-full gap-2 md:w-auto">
                 <button 
                   onClick={deleteSelectedProducts}
-                  className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 hover:border-red-500 flex items-center gap-2 px-4 py-3 rounded-xl font-bold transition-all"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-bold text-red-500 transition-all hover:border-red-500 hover:bg-red-500/20 md:w-auto"
                 >
                   <Trash2 size={18} />
                   Eliminar Selección ({selected.size})
@@ -544,8 +544,86 @@ export default function InventarioPage() {
         {/* ─── TABLA PRODUCTOS ─── */}
         {tab === 'products' && (
           <div className="bg-wms-surface border border-wms-border rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            {/* Vista móvil: información esencial y acciones sin scroll horizontal. */}
+            <div className="divide-y divide-wms-border/60 md:hidden">
+              {filtered.length > 0 && (
+                <div className="flex items-center justify-between bg-wms-card/40 px-4 py-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-wms-muted">
+                    {filtered.length} productos
+                  </span>
+                  <button onClick={selectAll} className="flex min-h-9 items-center gap-2 rounded-lg border border-wms-border px-3 text-xs font-bold text-white">
+                    <span className={`flex h-4 w-4 items-center justify-center rounded border ${selected.size === filtered.length && filtered.length > 0 ? 'border-leon-red bg-leon-red' : 'border-wms-muted'}`}>
+                      {selected.size === filtered.length && filtered.length > 0 && <Check size={10} />}
+                    </span>
+                    Seleccionar todo
+                  </button>
+                </div>
+              )}
+
+              {filtered.length > 0 ? filtered.map(p => {
+                const defaultCost = getDefaultCost(p);
+                const totalStock = p.locations.reduce((sum, location) => sum + location.quantity, 0);
+                const isSelected = selected.has(p.id);
+
+                return (
+                  <article key={`mobile-${p.id}`} className={isSelected ? 'bg-leon-red/5 p-4' : 'p-4'}>
+                    <div className="flex items-start gap-3">
+                      <button
+                        onClick={e => toggleSelect(p.id, e)}
+                        className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${isSelected ? 'border-leon-red bg-leon-red' : 'border-wms-border'}`}
+                        aria-label={isSelected ? `Deseleccionar ${p.name}` : `Seleccionar ${p.name}`}
+                      >
+                        {isSelected && <Check size={14} />}
+                      </button>
+
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-wms-border bg-wms-bg">
+                        {p.imageUrl ? (
+                          <Image src={getHighResImageUrl(p.imageUrl) ?? ''} alt={p.name} fill className="object-contain p-1" sizes="56px" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-wms-muted"><Package size={20} /></div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-mono text-[10px] font-black text-leon-red-light">{p.sku}</p>
+                            <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white">{p.name}</h3>
+                          </div>
+                          <button
+                            onClick={() => setPrintingProduct(p)}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-wms-border bg-wms-card text-wms-muted"
+                            aria-label={`Imprimir etiqueta de ${p.name}`}
+                          >
+                            <Printer size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-wms-border/60 bg-wms-bg/50 p-3 text-center">
+                      <div><p className="text-[9px] uppercase text-wms-muted">Costo</p><p className="mt-1 truncate text-xs font-bold">{defaultCost ? formatPrice(defaultCost.cost, defaultCost.currency) : '—'}</p></div>
+                      <div><p className="text-[9px] uppercase text-wms-muted">Venta</p><p className="mt-1 truncate text-xs font-bold">{formatPrice(p.salePrice, p.currency)}</p></div>
+                      <div><p className="text-[9px] uppercase text-wms-muted">Stock</p><p className={`mt-1 text-xs font-black ${totalStock > 0 ? 'text-emerald-400' : 'text-wms-muted'}`}>{totalStock} un.</p></div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {p.locations.length > 0 ? p.locations.map(location => (
+                        <span key={location.id} className="inline-flex items-center gap-1 rounded-md border border-wms-border bg-wms-card px-2 py-1 font-mono text-[10px] font-bold">
+                          <MapPin size={10} className="text-leon-red" />
+                          {location.location.aisle}-{location.location.section}-{location.location.level} · {location.quantity}
+                        </span>
+                      )) : <span className="text-[10px] italic text-wms-muted">Sin ubicación asignada</span>}
+                    </div>
+                  </article>
+                );
+              }) : (
+                <p className="px-4 py-12 text-center text-sm text-wms-muted">Sin productos</p>
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1120px]">
                 <thead>
                   <tr className="border-b border-wms-border">
                     <th className="px-3 py-3 text-left">
@@ -749,7 +827,7 @@ export default function InventarioPage() {
                                 <p className="text-sm text-wms-muted italic">Sin proveedores vinculados</p>
                               )}
                               {/* Formulario para agregar proveedor */}
-                              <div className="flex gap-2 items-center pt-2">
+                              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center">
                                 <select value={linkForm.supplierId} onChange={e => setLinkForm({ ...linkForm, supplierId: e.target.value })} onClick={e => e.stopPropagation()}
                                   className="flex-1 bg-wms-card border border-wms-border rounded-lg px-3 py-2 text-sm text-white">
                                   <option value="">Seleccionar proveedor...</option>
@@ -759,7 +837,7 @@ export default function InventarioPage() {
                                 </select>
                                 <input type="number" placeholder="Costo" value={linkForm.costPrice}
                                   onChange={e => setLinkForm({ ...linkForm, costPrice: e.target.value })} onClick={e => e.stopPropagation()}
-                                  className="w-24 bg-wms-card border border-wms-border rounded-lg px-3 py-2 text-sm text-white" />
+                                  className="w-full bg-wms-card border border-wms-border rounded-lg px-3 py-2 text-sm text-white sm:w-24" />
                                 <select value={linkForm.currency} onChange={e => setLinkForm({ ...linkForm, currency: e.target.value })} onClick={e => e.stopPropagation()}
                                   className="bg-wms-card border border-wms-border rounded-lg px-3 py-2 text-sm text-white">
                                   <option value="CLP">CLP</option><option value="USD">USD</option>
@@ -799,7 +877,7 @@ export default function InventarioPage() {
                                 <p className="text-sm text-wms-muted italic">Sin stock asignado</p>
                               )}
                               {/* Formulario para agregar stock */}
-                              <div className="flex gap-2 items-center pt-2">
+                              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center">
                                 <select value={stockForm.locationId} onChange={e => setStockForm({ ...stockForm, locationId: e.target.value })} onClick={e => e.stopPropagation()}
                                   className="flex-1 bg-wms-card border border-wms-border rounded-lg px-3 py-2 text-sm text-white">
                                   <option value="">Seleccionar ubicación...</option>
@@ -809,7 +887,7 @@ export default function InventarioPage() {
                                 </select>
                                 <input type="number" placeholder="Cant." value={stockForm.quantity}
                                   onChange={e => setStockForm({ ...stockForm, quantity: e.target.value })} onClick={e => e.stopPropagation()}
-                                  className="w-24 bg-wms-card border border-wms-border rounded-lg px-3 py-2 text-sm text-white" />
+                                  className="w-full bg-wms-card border border-wms-border rounded-lg px-3 py-2 text-sm text-white sm:w-24" />
                                 <button onClick={(e) => { e.stopPropagation(); updateProductStock(p.id); }}
                                   disabled={!stockForm.locationId || !stockForm.quantity || loading}
                                   className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-40 transition-colors">
@@ -858,8 +936,22 @@ export default function InventarioPage() {
 
         {/* ─── TABLA UBICACIONES ─── */}
         {tab === 'locations' && (
-          <div className="bg-wms-surface border border-wms-border rounded-2xl overflow-hidden">
-            <table className="w-full">
+          <div className="overflow-x-auto rounded-2xl border border-wms-border bg-wms-surface">
+            <div className="divide-y divide-wms-border/60 md:hidden">
+              {locations.length > 0 ? locations.map(location => (
+                <article key={`mobile-${location.id}`} className="flex items-center justify-between gap-4 p-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-wms-muted">Ubicación</p>
+                    <p className="mt-1 font-mono text-lg font-black text-leon-red-light">{location.aisle}-{location.section}-{location.level}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase text-wms-muted">Secuencia</p>
+                    <p className="mt-1 font-mono font-bold text-white">{location.sequenceIndex}</p>
+                  </div>
+                </article>
+              )) : <p className="p-10 text-center text-sm text-wms-muted">Sin ubicaciones</p>}
+            </div>
+            <table className="hidden w-full min-w-[560px] md:table">
               <thead><tr className="border-b border-wms-border">
                 <th className="px-6 py-4 text-left text-xs font-bold text-wms-muted uppercase">Pasillo</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-wms-muted uppercase">Sección</th>
@@ -884,8 +976,22 @@ export default function InventarioPage() {
 
         {/* ─── TABLA PROVEEDORES ─── */}
         {tab === 'suppliers' && (
-          <div className="bg-wms-surface border border-wms-border rounded-2xl overflow-hidden">
-            <table className="w-full">
+          <div className="overflow-x-auto rounded-2xl border border-wms-border bg-wms-surface">
+            <div className="divide-y divide-wms-border/60 md:hidden">
+              {suppliers.length > 0 ? suppliers.map(supplier => (
+                <article key={`mobile-${supplier.id}`} className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-bold text-white">{supplier.name}</h3>
+                      <p className="mt-1 break-words text-xs text-wms-muted">{supplier.contact || 'Sin contacto'}</p>
+                    </div>
+                    <span className="shrink-0 rounded-lg bg-leon-red/10 px-2.5 py-1 text-xs font-black text-leon-red-light">{supplier._count.products} prod.</span>
+                  </div>
+                  <p className="text-xs"><span className="text-wms-muted">País:</span> {supplier.country || '—'}</p>
+                </article>
+              )) : <p className="p-10 text-center text-sm text-wms-muted">Sin proveedores</p>}
+            </div>
+            <table className="hidden w-full min-w-[620px] md:table">
               <thead><tr className="border-b border-wms-border">
                 <th className="px-6 py-4 text-left text-xs font-bold text-wms-muted uppercase">Nombre</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-wms-muted uppercase">Contacto</th>
@@ -911,13 +1017,13 @@ export default function InventarioPage() {
 
       {/* ─── MODAL DE IMPRESIÓN ─── */}
       {printingProduct && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-wms-surface border border-wms-border w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="my-3 w-full max-w-md overflow-hidden rounded-2xl border border-wms-border bg-wms-surface shadow-2xl sm:my-0">
             <div className="bg-leon-red p-6 text-white">
               <h3 className="text-xl font-black italic uppercase">Imprimir Etiquetas</h3>
               <p className="text-xs opacity-80 uppercase font-bold truncate mt-1">{printingProduct.name}</p>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="space-y-5 p-5 sm:space-y-6 sm:p-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-wms-muted uppercase mb-2 block tracking-widest">Cantidad</label>

@@ -103,6 +103,15 @@ export async function POST(req: NextRequest) {
         }
       });
 
+      await prisma.auditLog.create({
+        data: {
+          orderId: sourceOrder.id,
+          userId: session.userId,
+          action: 'PICKING_STARTED',
+          metadata: { orderIds: ordersToLock.map(o => o.id) }
+        }
+      });
+
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       return NextResponse.json(order);
     }
@@ -191,6 +200,29 @@ export async function POST(req: NextRequest) {
             });
           }
         }
+
+        // Registrar el movimiento para poder revertir inventario si el
+        // operario cancela una recolección incompleta.
+        if (targetItemForMethod) {
+          const pickedItem = await tx.orderItem.findUnique({
+            where: { id: targetOrderItemIds[0] },
+            select: { productId: true }
+          });
+
+          await tx.auditLog.create({
+            data: {
+              orderId: targetItemForMethod.orderId,
+              userId: session.userId,
+              action: 'PICK_ITEM',
+              metadata: {
+                productId: pickedItem?.productId || productId,
+                locationId: locationId || null,
+                quantity: quantityToPick,
+                method: method || 'MANUAL'
+              }
+            }
+          });
+        }
       });
 
       return NextResponse.json({ success: true });
@@ -240,6 +272,9 @@ export async function POST(req: NextRequest) {
         where: { id: orderId }
       });
       if (!sourceOrder) return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 });
+      if (sourceOrder.status !== 'PICKING' || sourceOrder.lockedBy !== session.userId) {
+        return NextResponse.json({ error: 'La recolección ya no está activa para este usuario' }, { status: 409 });
+      }
 
       const orderIds = sourceOrder.shippingId
         ? (await prisma.order.findMany({
@@ -248,13 +283,113 @@ export async function POST(req: NextRequest) {
           })).map(o => o.id)
         : [orderId];
 
-      await prisma.order.updateMany({
-        where: { id: { in: orderIds } },
-        data: { 
-          status: 'PENDING',
-          lockedBy: null,
-          lockExpiresAt: null
+      const pickingStarted = await prisma.auditLog.findFirst({
+        where: {
+          orderId: sourceOrder.id,
+          userId: session.userId,
+          action: 'PICKING_STARTED'
+        },
+        orderBy: { timestamp: 'desc' }
+      });
+
+      const movements = pickingStarted ? await prisma.auditLog.findMany({
+        where: {
+          orderId: { in: orderIds },
+          userId: session.userId,
+          action: 'PICK_ITEM',
+          timestamp: { gte: pickingStarted.timestamp }
         }
+      }) : [];
+
+      const pickedItems = await prisma.orderItem.findMany({
+        where: { orderId: { in: orderIds }, quantityPicked: { gt: 0 } },
+        include: { product: { include: { locations: true } } }
+      });
+
+      const restoredByProduct = new Map<string, number>();
+
+      await prisma.$transaction(async tx => {
+        // Revertir exactamente cada descuento registrado durante esta sesión.
+        for (const movement of movements) {
+          const metadata = movement.metadata as Record<string, unknown> | null;
+          const movementProductId = typeof metadata?.productId === 'string' ? metadata.productId : null;
+          const movementLocationId = typeof metadata?.locationId === 'string' ? metadata.locationId : null;
+          const movementQuantity = typeof metadata?.quantity === 'number' ? metadata.quantity : 0;
+
+          if (movementProductId && movementLocationId && movementQuantity > 0) {
+            await tx.productLocation.update({
+              where: {
+                productId_locationId: {
+                  productId: movementProductId,
+                  locationId: movementLocationId
+                }
+              },
+              data: { quantity: { increment: movementQuantity } }
+            });
+            restoredByProduct.set(
+              movementProductId,
+              (restoredByProduct.get(movementProductId) || 0) + movementQuantity
+            );
+          }
+        }
+
+        // Compatibilidad con picks realizados antes de que existiera el log
+        // de movimientos: devolver cualquier diferencia a su ubicación activa.
+        const pickedByProduct = new Map<string, { quantity: number; locationId?: string }>();
+        for (const item of pickedItems) {
+          const current = pickedByProduct.get(item.productId);
+          if (current) {
+            current.quantity += item.quantityPicked;
+          } else {
+            pickedByProduct.set(item.productId, {
+              quantity: item.quantityPicked,
+              locationId: item.product.locations[0]?.locationId
+            });
+          }
+        }
+
+        for (const [pickedProductId, picked] of pickedByProduct.entries()) {
+          const missingRestore = picked.quantity - (restoredByProduct.get(pickedProductId) || 0);
+          if (missingRestore > 0 && picked.locationId) {
+            await tx.productLocation.update({
+              where: {
+                productId_locationId: {
+                  productId: pickedProductId,
+                  locationId: picked.locationId
+                }
+              },
+              data: { quantity: { increment: missingRestore } }
+            });
+          }
+        }
+
+        await tx.orderItem.updateMany({
+          where: { orderId: { in: orderIds } },
+          data: { quantityPicked: 0 }
+        });
+
+        await tx.order.updateMany({
+          where: { id: { in: orderIds } },
+          data: {
+            status: 'PENDING',
+            lockedBy: null,
+            lockExpiresAt: null,
+            pickingMethod: null
+          }
+        });
+
+        await tx.auditLog.create({
+          data: {
+            orderId: sourceOrder.id,
+            userId: session.userId,
+            action: 'PICKING_CANCELLED',
+            metadata: {
+              orderIds,
+              resetItems: pickedItems.length,
+              restoredUnits: pickedItems.reduce((total, item) => total + item.quantityPicked, 0)
+            }
+          }
+        });
       });
 
       const order = await prisma.order.findUnique({ where: { id: orderId } });

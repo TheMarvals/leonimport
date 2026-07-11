@@ -295,13 +295,13 @@ export const SupervisorDashboard = () => {
 
       {/* MODAL DE RESOLUCIÓN */}
       {resolvingItem && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-wms-surface border-2 border-leon-red w-full max-w-lg rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(255,0,0,0.2)]">
-            <div className="bg-leon-red p-6 text-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/90 p-3 backdrop-blur-md sm:items-center sm:p-4">
+          <div className="my-3 w-full max-w-lg overflow-hidden rounded-2xl border-2 border-leon-red bg-wms-surface shadow-[0_0_50px_rgba(255,0,0,0.2)] sm:my-0">
+            <div className="bg-leon-red p-5 text-white shadow-xl sm:p-6">
               <h3 className="text-xl font-black italic uppercase tracking-tighter">Vincular Producto WMS</h3>
               <p className="text-sm opacity-90 uppercase font-black truncate mt-1">{resolvingItem.item.product.name}</p>
             </div>
-            <div className="p-6 space-y-5 bg-wms-bg">
+            <div className="space-y-5 bg-wms-bg p-4 sm:p-6">
               {/* TABS */}
               <div className="flex bg-black rounded-xl p-1 shadow-inner mb-6">
                 <button
@@ -375,7 +375,7 @@ export const SupervisorDashboard = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="text-xs font-bold text-wms-muted uppercase mb-1 block">Marca</label>
                       <input 
@@ -396,7 +396,7 @@ export const SupervisorDashboard = () => {
                         className="w-full bg-black border border-wms-border px-3 py-2 rounded-lg text-white font-bold outline-none focus:border-amber-500 transition-colors uppercase"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <label className="text-xs font-bold text-wms-muted uppercase mb-1 block">Talla / Tamaño</label>
                       <input 
                         type="text"
@@ -444,15 +444,15 @@ export const SupervisorDashboard = () => {
             <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-black">Warehouse Management System</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3 md:w-auto">
           <Link 
             href="/admin" 
-            className="bg-wms-card hover:bg-leon-red/10 border border-wms-border hover:border-leon-red/50 text-white/90 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 tracking-wide shadow-sm"
+            className="flex items-center justify-center gap-2 rounded-xl border border-wms-border bg-wms-card px-3 py-2.5 text-xs font-bold tracking-wide text-white/90 shadow-sm transition-all hover:border-leon-red/50 hover:bg-leon-red/10 sm:rounded-2xl sm:px-5"
           >
             <Shield size={13} strokeWidth={3} className="text-leon-red-light" /> PERSONAL
           </Link>
 
-          <div className="bg-emerald-500/5 border border-emerald-500/35 px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-sm">
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/5 px-3 py-2.5 shadow-sm sm:rounded-2xl sm:px-4">
             <Activity size={13} className="text-emerald-500 animate-pulse" strokeWidth={3} />
             <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">Live OK</span>
           </div>
@@ -630,7 +630,7 @@ export const SupervisorDashboard = () => {
       {activeTab === 'history' && (
         <div className="flex-1 flex flex-col min-h-0 gap-6">
           {/* MÉTRICAS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 flex-shrink-0">
+          <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 md:gap-6">
             <div className="bg-wms-card border border-wms-border/60 p-4 md:p-6 rounded-xl md:rounded-[2rem] shadow-xl hover:border-wms-border transition-all flex items-center justify-between group">
               <div>
                 <p className="text-wms-muted text-[10px] font-black uppercase tracking-widest">Órdenes Hoy</p>

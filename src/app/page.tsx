@@ -57,16 +57,16 @@ export default async function HomePage() {
       <div className="leon-brand-bar" />
 
       {/* User Bar */}
-      <div className="bg-wms-surface border-b border-wms-border px-4 md:px-8 py-3 flex justify-between items-center">
-        <p className="text-sm text-wms-muted">
-          Operario: <span className="text-white font-bold">{session.name}</span>
-          <span className="ml-3 bg-leon-red/20 text-leon-red px-2 py-0.5 rounded text-xs font-bold">
+      <div className="flex items-center justify-between gap-3 border-b border-wms-border bg-wms-surface px-4 py-3 md:px-8">
+        <p className="min-w-0 text-xs text-wms-muted sm:text-sm">
+          <span className="hidden sm:inline">Operario: </span><span className="font-bold text-white">{session.name}</span>
+          <span className="ml-2 inline-block rounded bg-leon-red/20 px-2 py-0.5 text-[10px] font-bold text-leon-red sm:ml-3 sm:text-xs">
             {session.role}
           </span>
         </p>
         <form action="/api/auth/logout" method="POST">
-          <button type="submit" className="text-wms-muted hover:text-red-400 text-sm flex items-center gap-1 transition-colors">
-            <LogOut size={14} /> Cerrar Sesión
+          <button type="submit" className="flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs text-wms-muted transition-colors hover:bg-red-500/10 hover:text-red-400 sm:text-sm">
+            <LogOut size={16} /> <span className="hidden sm:inline">Cerrar Sesión</span><span className="sm:hidden">Salir</span>
           </button>
         </form>
       </div>
@@ -74,15 +74,15 @@ export default async function HomePage() {
       <div className="flex-1 flex items-center justify-center p-4 md:p-8">
         <div className="max-w-4xl w-full space-y-8 md:space-y-12">
           <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              LEÓN<span className="text-leon-red"> IMPORT</span>
+            <h1 className="whitespace-nowrap text-4xl font-black tracking-tighter text-white md:text-6xl">
+              LEÓN <span className="text-leon-red">IMPORT</span>
             </h1>
-            <p className="text-wms-muted uppercase tracking-[0.3em] text-sm">
+            <p className="text-xs uppercase tracking-[0.2em] text-wms-muted sm:text-sm sm:tracking-[0.3em]">
               Sistema de Gestión de Almacén
             </p>
           </div>
 
-          <div className={`grid grid-cols-1 ${visibleModules.length <= 2 ? 'md:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-4'} gap-6`}>
+          <div className={`grid grid-cols-1 ${visibleModules.length <= 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4'} gap-4 md:gap-6`}>
             {visibleModules.map((mod) => (
               <Link
                 key={mod.href}

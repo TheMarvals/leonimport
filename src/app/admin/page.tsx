@@ -229,14 +229,14 @@ export default function AdminPage() {
 
       {/* RESOLUTION MODAL */}
       {resolvingItem && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-wms-surface border-2 border-leon-red w-full max-w-lg rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(255,0,0,0.2)]">
-            <div className="bg-leon-red p-6 text-white">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/90 p-3 backdrop-blur-md sm:items-center sm:p-4">
+          <div className="my-3 w-full max-w-lg overflow-hidden rounded-2xl border-2 border-leon-red bg-wms-surface shadow-[0_0_50px_rgba(255,0,0,0.2)] sm:my-0">
+            <div className="bg-leon-red p-5 text-white sm:p-6">
               <h3 className="text-xl font-black italic uppercase tracking-tighter">Resolver Producto</h3>
               <p className="text-sm opacity-90 uppercase font-black truncate mt-1">{resolvingItem.name}</p>
               <p className="text-[10px] opacity-70 mt-1 font-mono">{resolvingItem.orders.length} orden(es) • {resolvingItem.totalQuantity} unidad(es)</p>
             </div>
-            <div className="p-6 space-y-5 bg-wms-bg">
+            <div className="space-y-5 bg-wms-bg p-4 sm:p-6">
               <div className="flex bg-black rounded-xl p-1 shadow-inner">
                 <button onClick={() => setIsCreatingNew(false)}
                   className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
@@ -292,7 +292,7 @@ export default function AdminPage() {
                         isSkuEditable ? 'border-amber-500 text-white focus:border-amber-400' : 'border-amber-500/30 text-amber-500 opacity-80 cursor-not-allowed'
                       }`} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="text-xs font-bold text-wms-muted uppercase mb-1 block">Marca</label>
                       <input type="text" value={newBrand} onChange={(e) => setNewBrand(e.target.value)}
@@ -341,21 +341,21 @@ export default function AdminPage() {
       </header>
 
       {/* ─── TABS ─── */}
-      <div className="flex flex-wrap gap-2 md:gap-4 mb-6 md:mb-8">
+      <div className="hide-scrollbar mb-6 flex w-full gap-2 overflow-x-auto pb-1 md:mb-8 md:gap-4">
         <button onClick={() => setTab('users')}
-          className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
             tab === 'users' ? 'bg-leon-red text-white shadow-lg shadow-leon-red/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
           }`}>
           <Users size={16} className="md:w-[18px] md:h-[18px]" /> USUARIOS ({users.length})
         </button>
         <button onClick={() => setTab('ml-missing')}
-          className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
             tab === 'ml-missing' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
           }`}>
           <AlertCircle size={16} className="md:w-[18px] md:h-[18px]" /> ML-MISSING ({ghostGroups.length})
         </button>
         <Link href="/admin/sync"
-          className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30 transition-all">
+          className="shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30 transition-all">
           <Activity size={16} className="md:w-[18px] md:h-[18px]" /> SYNC
         </Link>
       </div>
@@ -374,7 +374,7 @@ export default function AdminPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {users.map((user: any) => (
-              <div key={user.id} className={`bg-wms-surface border ${user.isActive ? 'border-wms-border' : 'border-red-900/50 grayscale'} p-6 rounded-3xl relative overflow-hidden group`}>
+              <div key={user.id} className={`bg-wms-surface border ${user.isActive ? 'border-wms-border' : 'border-red-900/50 grayscale'} p-5 md:p-6 rounded-2xl md:rounded-3xl relative overflow-hidden group`}>
                 <div className="flex justify-between items-start mb-6">
                   <div className="bg-wms-bg p-3 rounded-2xl">
                     <Shield size={24} className={user.role === 'ADMIN' ? 'text-leon-red' : 'text-wms-muted'} />
@@ -470,19 +470,19 @@ export default function AdminPage() {
 
       {/* ─── USER EDIT MODAL ─── */}
       {editingUser && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSave} className="bg-wms-surface border border-wms-border w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
-            <div className="bg-leon-red p-6">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-md sm:items-center sm:p-4">
+          <form onSubmit={handleSave} className="my-3 w-full max-w-md overflow-hidden rounded-2xl border border-wms-border bg-wms-surface shadow-2xl sm:my-0 sm:rounded-3xl">
+            <div className="bg-leon-red p-5 sm:p-6">
               <h2 className="text-xl font-black italic">{isNew ? 'CREAR NUEVO USUARIO' : 'EDITAR USUARIO'}</h2>
             </div>
-            <div className="p-8 space-y-6">
+            <div className="space-y-5 p-5 sm:space-y-6 sm:p-8">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-wms-muted uppercase">Nombre Completo</label>
                 <input type="text" required value={editingUser.name}
                   onChange={e => setEditingUser({...editingUser, name: e.target.value})}
                   className="w-full bg-wms-bg border border-wms-border p-4 rounded-xl text-white outline-none focus:border-leon-red" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-wms-muted uppercase">PIN de Acceso</label>
                   <input type="text" required maxLength={6}
@@ -516,7 +516,7 @@ export default function AdminPage() {
                   <label htmlFor="isActive" className="text-sm font-bold uppercase cursor-pointer">Cuenta Activa</label>
                 </div>
               )}
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:gap-4 sm:pt-4">
                 <button type="button" onClick={() => setEditingUser(null)}
                   className="flex-1 bg-wms-bg text-wms-muted py-4 rounded-xl font-bold hover:text-white transition-colors">CANCELAR</button>
                 <button type="submit"

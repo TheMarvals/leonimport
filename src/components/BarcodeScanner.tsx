@@ -268,8 +268,8 @@ export default function BarcodeScanner({ onScan, embedded = false, buttonLabel =
 
   // Modal flotante
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-wms-bg border border-wms-border rounded-3xl w-full max-w-lg p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/80 p-2 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4 md:items-center">
+      <div className="max-h-[calc(100svh-1rem)] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-wms-border bg-wms-bg p-4 shadow-2xl animate-in slide-in-from-bottom-4 duration-300 sm:max-h-[calc(100svh-2rem)] sm:rounded-3xl sm:p-6">
         {scannerView}
       </div>
     </div>

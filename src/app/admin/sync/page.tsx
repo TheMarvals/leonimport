@@ -166,10 +166,10 @@ export default function SyncDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-wms-bg text-white p-8">
+    <div className="min-h-screen bg-wms-bg p-4 text-white md:p-8">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 right-6 z-50 animate-slide-in">
+        <div className="fixed left-4 right-4 top-4 z-50 animate-slide-in sm:left-auto sm:right-6 sm:top-6 sm:max-w-md">
           <div className={`flex items-start gap-3 px-5 py-4 rounded-2xl shadow-2xl border backdrop-blur-sm ${
             toast.type === 'SUCCESS'
               ? 'bg-green-500/10 border-green-500/30 text-green-400'
@@ -196,24 +196,24 @@ export default function SyncDashboardPage() {
         </div>
       )}
 
-      <div className="leon-brand-bar mb-8 -mx-8 -mt-8" />
+      <div className="leon-brand-bar -mx-4 -mt-4 mb-6 md:-mx-8 md:-mt-8 md:mb-8" />
 
-      <header className="flex justify-between items-center mb-12">
-        <div className="flex items-center gap-4">
+      <header className="mb-8 flex flex-col gap-5 md:mb-12 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-start gap-3 md:items-center md:gap-4">
           <Link href="/admin" className="text-wms-muted hover:text-white transition-colors">
-            <ArrowLeft size={32} />
+            <ArrowLeft size={26} className="md:h-8 md:w-8" />
           </Link>
           <div>
-            <h1 className="text-4xl font-black tracking-tighter">
+            <h1 className="text-2xl font-black tracking-tighter sm:text-3xl md:text-4xl">
               HISTORIAL DE <span className="text-leon-red">SYNC</span>
             </h1>
-            <p className="text-wms-muted uppercase tracking-widest text-sm">Monitoreo de Sincronización con MercadoLibre</p>
+            <p className="mt-1 text-[10px] uppercase tracking-wider text-wms-muted sm:text-xs md:text-sm md:tracking-widest">Monitoreo de Sincronización con MercadoLibre</p>
           </div>
         </div>
         <button
           onClick={handleSyncAndRefresh}
           disabled={loading || syncing}
-          className="bg-leon-red hover:bg-leon-red-light text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all shadow-lg shadow-leon-red/20"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-leon-red px-6 py-3 font-black text-white shadow-lg shadow-leon-red/20 transition-all hover:bg-leon-red-light md:w-auto md:rounded-2xl md:hover:scale-105"
         >
           <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
           {syncing ? 'SINCRONIZANDO...' : 'SYNC + REFRESH'}
@@ -222,7 +222,7 @@ export default function SyncDashboardPage() {
 
       {/* Métricas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-wms-surface border border-wms-border p-5 rounded-2xl">
+        <div className="rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-5">
           <div className="flex items-center gap-3 mb-2">
             <Activity size={18} className="text-leon-red" />
             <span className="text-xs font-bold text-wms-muted uppercase tracking-widest">Total Syncs</span>
@@ -230,7 +230,7 @@ export default function SyncDashboardPage() {
           <p className="text-3xl font-black">{metrics?.totalSyncs || 0}</p>
         </div>
 
-        <div className="bg-wms-surface border border-wms-border p-5 rounded-2xl">
+        <div className="rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-5">
           <div className="flex items-center gap-3 mb-2">
             <CheckCircle2 size={18} className="text-green-500" />
             <span className="text-xs font-bold text-wms-muted uppercase tracking-widest">Importadas</span>
@@ -238,7 +238,7 @@ export default function SyncDashboardPage() {
           <p className="text-3xl font-black">{metrics?.totalImported || 0}</p>
         </div>
 
-        <div className="bg-wms-surface border border-wms-border p-5 rounded-2xl">
+        <div className="rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-5">
           <div className="flex items-center gap-3 mb-2">
             <Clock size={18} className="text-blue-400" />
             <span className="text-xs font-bold text-wms-muted uppercase tracking-widest">Promedio</span>
@@ -246,7 +246,7 @@ export default function SyncDashboardPage() {
           <p className="text-3xl font-black">{formatDuration(metrics?.avgDurationMs || null)}</p>
         </div>
 
-        <div className="bg-wms-surface border border-wms-border p-5 rounded-2xl">
+        <div className="rounded-2xl border border-wms-border bg-wms-surface p-4 sm:p-5">
           <div className="flex items-center gap-3 mb-2">
             <AlertTriangle size={18} className={metrics?.totalErrors ? 'text-yellow-500' : 'text-green-500'} />
             <span className="text-xs font-bold text-wms-muted uppercase tracking-widest">Errores</span>
@@ -318,8 +318,8 @@ export default function SyncDashboardPage() {
       {/* Último Sync */}
       {metrics?.lastSync && (
         <div className="bg-wms-surface border border-wms-border p-5 rounded-2xl mb-8">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <ListOrdered size={18} className="text-leon-red" />
               <span className="text-sm font-bold text-wms-muted uppercase tracking-widest">Último Sync</span>
               {/* Estado badge */}
@@ -337,7 +337,7 @@ export default function SyncDashboardPage() {
               <span className="text-lg font-bold">{formatDate(metrics.lastSync.createdAt)}</span>
               <span className="text-xs text-wms-muted">({lastSyncElapsed()} atrás)</span>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-5 sm:gap-6">
               <div className="text-center">
                 <p className="text-xs text-wms-muted uppercase">Procesadas</p>
                 <p className="text-xl font-black">{metrics.lastSync.totalProcessed}</p>
@@ -365,7 +365,7 @@ export default function SyncDashboardPage() {
 
       {/* Filtros */}
       <div className="bg-wms-surface border border-wms-border rounded-2xl p-5 mb-6">
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-wms-muted" />
             <span className="text-xs font-black uppercase tracking-widest text-wms-muted">Filtros</span>
@@ -428,7 +428,7 @@ export default function SyncDashboardPage() {
           </div>
 
           {/* Contador y limpiar */}
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center justify-between gap-3 sm:col-span-2 lg:ml-auto">
             {(filterStatus !== 'all' || filterDateFrom || filterDateTo || filterMinImported > 0) && (
               <button
                 onClick={clearFilters}
@@ -446,8 +446,59 @@ export default function SyncDashboardPage() {
 
       {/* Tabla de Historial */}
       <div className="bg-wms-surface border border-wms-border rounded-2xl overflow-hidden">
+        {/* En móvil, cada sincronización se presenta como una tarjeta legible. */}
+        <div className="divide-y divide-wms-border/60 md:hidden">
+          {loading ? (
+            <div className="p-8 text-center text-sm text-wms-muted">
+              <RefreshCw size={20} className="mr-2 inline-block animate-spin" />
+              Cargando historial...
+            </div>
+          ) : paginatedLogs.length === 0 ? (
+            <div className="p-8 text-center text-sm leading-6 text-wms-muted">
+              {logs.length === 0
+                ? 'Aún no hay registros de sincronización.'
+                : 'No hay registros que coincidan con los filtros.'}
+            </div>
+          ) : paginatedLogs.map(log => (
+            <article key={`mobile-${log.id}`} className="space-y-4 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-mono text-xs font-bold text-white">{formatDate(log.createdAt)}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-wider text-wms-muted">
+                    Duración {formatDuration(log.durationMs)}
+                  </p>
+                </div>
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black ${
+                  log.status === 'SUCCESS'
+                    ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                    : 'border-red-500/30 bg-red-500/10 text-red-400'
+                }`}>
+                  {log.status === 'SUCCESS' ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                  {log.status === 'SUCCESS' ? 'OK' : 'ERROR'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 rounded-xl bg-wms-bg/60 p-3 text-center">
+                <div><p className="text-[9px] uppercase text-wms-muted">Proc.</p><p className="mt-1 font-black">{log.totalProcessed}</p></div>
+                <div><p className="text-[9px] uppercase text-wms-muted">Import.</p><p className="mt-1 font-black text-green-400">{log.imported}</p></div>
+                <div><p className="text-[9px] uppercase text-wms-muted">Salt.</p><p className="mt-1 font-black">{log.skipped}</p></div>
+                <div><p className="text-[9px] uppercase text-wms-muted">Resol.</p><p className="mt-1 font-black text-yellow-400">{log.resolutionRequired}</p></div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 text-[10px] font-bold">
+                <span className="rounded-lg border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-blue-400">SKU {log.reusedBySku}</span>
+                <span className="rounded-lg border border-purple-500/20 bg-purple-500/10 px-2 py-1 text-purple-400">Alias {log.reusedByAlias}</span>
+                <span className="rounded-lg border border-green-500/20 bg-green-500/10 px-2 py-1 text-green-400">Creados {log.autoCreated}</span>
+                <span className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-yellow-400">Missing {log.missingCreated}</span>
+              </div>
+
+              {log.error && <p className="break-words rounded-lg bg-red-500/10 p-2 text-xs text-red-300">{log.error}</p>}
+            </article>
+          ))}
+        </div>
+
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-sm">
+          <table className="hidden min-w-[1100px] w-full text-sm md:table">
             <thead>
               <tr className="border-b border-wms-border text-wms-muted uppercase tracking-widest text-xs">
                 <th className="text-left p-4 font-bold">Inicio</th>

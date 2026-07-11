@@ -158,13 +158,50 @@ export default function PickingPage() {
     return [...groups, ...singles];
   }, [orders]);
 
+  // Al retomar una orden parcial, ubicar el primer producto que aún tenga
+  // unidades pendientes respetando el mismo orden S-Shape de la vista.
+  const getResumeItemIndex = useCallback((order: Order) => {
+    const sorted = [...order.items].sort((a, b) => {
+      const locA = a.product.locations.find(l => l.quantity > 0)?.location?.sequenceIndex || 999999;
+      const locB = b.product.locations.find(l => l.quantity > 0)?.location?.sequenceIndex || 999999;
+      return locA - locB;
+    });
+
+    const progressByProduct = new Map<string, { total: number; picked: number }>();
+    const productOrder: string[] = [];
+
+    for (const item of sorted) {
+      const progress = progressByProduct.get(item.product.id);
+      if (progress) {
+        progress.total += item.quantityTotal;
+        progress.picked += item.quantityPicked;
+      } else {
+        progressByProduct.set(item.product.id, {
+          total: item.quantityTotal,
+          picked: item.quantityPicked,
+        });
+        productOrder.push(item.product.id);
+      }
+    }
+
+    const pendingIndex = productOrder.findIndex(productId => {
+      const progress = progressByProduct.get(productId);
+      return progress ? progress.picked < progress.total : false;
+    });
+
+    return pendingIndex >= 0 ? pendingIndex : Math.max(0, productOrder.length - 1);
+  }, []);
+
   // Si hay una orden que ya está en PICKING, reanudarla
   useEffect(() => {
     if (!activeOrder) {
       const inProgress = groupedOrdersList.find((o: Order) => o.status === 'PICKING');
-      if (inProgress) setActiveOrder(inProgress);
+      if (inProgress) {
+        setCurrentItemIndex(getResumeItemIndex(inProgress));
+        setActiveOrder(inProgress);
+      }
     }
-  }, [groupedOrdersList, activeOrder]);
+  }, [groupedOrdersList, activeOrder, getResumeItemIndex]);
 
   // Timer para el cooldown de sincronización
   // Mutación: sincronización con ML
@@ -273,8 +310,8 @@ export default function PickingPage() {
       await pickingMutation.mutateAsync({ action: 'START_PICKING', orderId });
       const fullOrder = groupedOrdersList.find(o => o.id === orderId);
       if (fullOrder) {
+        setCurrentItemIndex(getResumeItemIndex(fullOrder));
         setActiveOrder({ ...fullOrder, status: 'PICKING' });
-        setCurrentItemIndex(0);
       }
     } catch {
       // Error handled in onError callback
@@ -291,18 +328,33 @@ export default function PickingPage() {
     if (!activeOrder) return;
     
     const confirmResult = await showConfirmModal(
-      '¿Estás seguro de cancelar el picking?',
-      'La orden volverá a estar disponible para otros usuarios.',
-      'Sí, cancelar'
+      '¿Reiniciar esta recolección?',
+      'Se borrará todo el avance de esta orden y el stock recolectado volverá al inventario.',
+      'Sí, reiniciar'
     );
     if (!confirmResult.isConfirmed) return;
 
     try {
       await pickingMutation.mutateAsync({ action: 'CANCEL_PICKING', orderId: activeOrder.id });
+      queryClient.setQueryData<Order[]>(['orders', 'picking'], (cachedOrders = []) =>
+        cachedOrders.map(order => {
+          const belongsToActiveGroup = activeOrder.shippingId
+            ? order.shippingId === activeOrder.shippingId
+            : order.id === activeOrder.id;
+
+          return belongsToActiveGroup
+            ? {
+                ...order,
+                status: 'PENDING',
+                items: order.items.map(item => ({ ...item, quantityPicked: 0 }))
+              }
+            : order;
+        })
+      );
       setActiveOrder(null);
       setCurrentItemIndex(0);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      showToast('Picking cancelado exitosamente.', 'info');
+      showToast('Recolección reiniciada. La orden volvió a su estado inicial.', 'info');
     } catch (err: any) {
       showToast('Error al cancelar: ' + err.message, 'error');
     }
@@ -438,16 +490,10 @@ export default function PickingPage() {
       return false;
     };
 
-    const scannedItem = activeOrder.items.find(isBarcodeMatch);
+    const matchingItems = activeOrder.items.filter(isBarcodeMatch);
+    const scannedItem = matchingItems.find(item => item.quantityPicked < item.quantityTotal);
 
     if (scannedItem) {
-      // Si el ítem ya está completo
-      if (scannedItem.quantityPicked >= scannedItem.quantityTotal) {
-        setScanError(`¡Ya has recolectado todos los ${scannedItem.product.name} necesarios!`);
-        setTimeout(() => setScanError(null), 3000);
-        return;
-      }
-      
       // Asegurar que el ítem escaneado sea el que está activo en la vista
       if (scannedItem.product.id === currentGroupItem?.product.id) {
         pickItem(1, method);
@@ -460,6 +506,9 @@ export default function PickingPage() {
           setTimeout(() => setScanError(null), 3000);
         }
       }
+    } else if (matchingItems.length > 0) {
+      setScanError(`¡Ya has recolectado todos los ${matchingItems[0].product.name} necesarios!`);
+      setTimeout(() => setScanError(null), 3000);
     } else {
       setScanError(`Código ${code} no pertenece a esta orden.`);
       setTimeout(() => setScanError(null), 3000);
@@ -484,7 +533,7 @@ export default function PickingPage() {
     return (
       <div className="min-h-screen bg-wms-bg text-wms-text font-sans">
         <div className="leon-brand-bar" />
-        <div className="max-w-5xl mx-auto p-6 space-y-6">
+        <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
             <div className="flex items-center gap-4">
               <Link href="/" className="p-2.5 bg-wms-card border border-wms-border hover:border-leon-red/50 text-wms-muted hover:text-white rounded-full hover:bg-leon-red/10 transition-all shadow-sm shrink-0">
@@ -549,7 +598,7 @@ export default function PickingPage() {
                 )}
               </div>
             ) : filteredOrders.map(o => (
-              <div key={o.id} className={`bg-wms-card border-wms-border/60 p-6 rounded-[2rem] hover:border-leon-red/50 transition-all duration-300 group shadow-xl flex flex-col justify-between gap-6 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] ${o.isFlex ? 'border-leon-red/40 bg-gradient-to-br from-leon-red/5 via-transparent to-transparent hover:border-leon-red/60' : 'border-wms-border'}`}>
+              <div key={o.id} className={`bg-wms-card border-wms-border/60 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] hover:border-leon-red/50 transition-all duration-300 group shadow-xl flex flex-col justify-between gap-5 sm:gap-6 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] ${o.isFlex ? 'border-leon-red/40 bg-gradient-to-br from-leon-red/5 via-transparent to-transparent hover:border-leon-red/60' : 'border-wms-border'}`}>
                 
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
@@ -665,7 +714,7 @@ export default function PickingPage() {
   const isOrderComplete = groupedItems.every(i => i.quantityPicked >= i.quantityTotal);
 
   return (
-    <div className="min-h-screen bg-wms-bg text-wms-text font-sans flex flex-col">
+    <div className="flex min-h-screen min-h-[100svh] flex-col bg-wms-bg font-sans text-wms-text">
       <div className="leon-brand-bar" />
       
       {/* Grupo Sticky Superior (Header + Banner) */}
@@ -687,8 +736,9 @@ export default function PickingPage() {
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
             <button 
               onClick={cancelPicking}
+              title="Salir y reiniciar la recolección"
               className="text-wms-muted hover:text-leon-red text-[9px] md:text-[10px] font-black uppercase transition-colors px-3 py-2 md:px-4 md:py-2 border border-wms-border hover:border-leon-red/30 rounded-lg md:rounded-xl">
-              Cancelar
+              Salir
             </button>
             {isOrderComplete && (
               <button onClick={completePicking} className="bg-green-600 hover:bg-green-500 text-white px-4 md:px-8 py-2 md:py-3 rounded-lg md:rounded-2xl font-black text-xs md:text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-600/20 uppercase tracking-widest">
@@ -720,12 +770,12 @@ export default function PickingPage() {
       </div>
 
       {/* Main Content: Current Item */}
-      <div className="flex-1 p-3 md:p-8 flex flex-col items-center justify-center overflow-hidden relative">
+      <div className="relative flex flex-1 flex-col items-center justify-start overflow-visible p-3 md:justify-center md:overflow-hidden md:p-8">
 
 
         {/* Toast de Error de Escaneo */}
         {scanError && (
-          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white px-6 py-3 rounded-full font-black text-sm md:text-base shadow-[0_0_20px_rgba(220,38,38,0.5)] animate-in slide-in-from-top-4 fade-in flex items-center gap-2">
+          <div className="fixed left-4 right-4 top-4 z-[100] flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-center text-sm font-black text-white shadow-[0_0_20px_rgba(220,38,38,0.5)] animate-in slide-in-from-top-4 fade-in md:left-1/2 md:right-auto md:top-8 md:-translate-x-1/2 md:rounded-full md:px-6 md:text-base">
             <AlertTriangle size={20} />
             {scanError}
           </div>
@@ -746,7 +796,7 @@ export default function PickingPage() {
           </div>
         ) : (
           currentGroupItem && (
-            <div className="w-full max-w-3xl bg-wms-surface border border-wms-border rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-12 space-y-6 md:space-y-10 shadow-2xl relative overflow-hidden mx-auto h-full md:h-auto flex flex-col justify-center">
+            <div className="relative mx-auto flex h-auto w-full max-w-3xl flex-col justify-center space-y-6 overflow-hidden rounded-[1.5rem] border border-wms-border bg-wms-surface p-4 shadow-2xl sm:p-5 md:space-y-10 md:rounded-[2.5rem] md:p-12">
               <div className="absolute top-0 right-0 p-4 md:p-8 opacity-5">
                 <Scan size={80} className="md:w-[120px] md:h-[120px]" />
               </div>
@@ -797,7 +847,7 @@ export default function PickingPage() {
 
               {/* Info de Producto */}
               <div className="bg-wms-card border border-wms-border rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-8 flex flex-col md:flex-row items-center gap-4 md:gap-8 relative z-10 shadow-inner">
-                <div className="w-32 h-32 md:w-48 md:h-48 bg-black rounded-xl md:rounded-[1.5rem] border border-wms-border flex-shrink-0 flex items-center justify-center overflow-hidden shadow-lg p-2 relative">
+                <div className="relative h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl border border-wms-border bg-black p-2 shadow-lg sm:h-32 sm:w-32 md:h-48 md:w-48 md:rounded-[1.5rem]">
                   {(currentGroupItem.mlImageUrl || currentGroupItem.product.imageUrl) ? (
                     <Image src={getHighResImageUrl(currentGroupItem.mlImageUrl || currentGroupItem.product.imageUrl)!} alt="Producto" fill className="object-contain mix-blend-lighten" sizes="(max-width: 768px) 128px, 192px" />
                   ) : (
