@@ -290,7 +290,9 @@ export default function PackingPage() {
 
       const primaryMlId = activeOrder.mlId.split(' + ')[0];
 
-      // 2. Intentar impresión
+      // Abrir pestaña de inmediato para evitar bloqueo de popup por seguridad del navegador
+      const printTab = window.open(`/api/packing/label/${primaryMlId}`, '_blank');
+
       const finalize = () => {
         setIsPrinting(false);
         showToast('¡Orden despachada exitosamente!', 'success');
@@ -307,23 +309,19 @@ export default function PackingPage() {
         });
 
         if (printRes.ok) {
-          // Impresión directa exitosa — finalizar inmediatamente
+          // Impresión directa exitosa — cerrar la pestaña temporal de fallback
+          if (printTab && !printTab.closed) {
+            printTab.close();
+          }
           finalize();
         } else {
-          // Fallback: abrir PDF en nueva pestaña para imprimir manualmente
-          const tab = window.open(`/api/packing/label/${primaryMlId}`, '_blank');
-          if (!tab || tab.closed) {
-            showModalAlert('Impresión manual requerida', 'Permite ventanas emergentes para ver la etiqueta, o usa el botón Imprimir en la orden desde la lista.', 'info');
-          }
+          // Si falló la impresión directa, la pestaña ya se abrió con el PDF, así que solo avisamos
+          console.warn('[Packing] Impresión directa falló, usando pestaña de fallback.');
           finalize();
         }
       } catch (err) {
         console.error('Error en impresión automática:', err);
-        // Fallback: abrir PDF en nueva pestaña
-        const tab = window.open(`/api/packing/label/${primaryMlId}`, '_blank');
-        if (!tab || tab.closed) {
-          showModalAlert('Impresión manual requerida', 'Permite ventanas emergentes para ver la etiqueta, o usa el botón Imprimir en la orden desde la lista.', 'info');
-        }
+        // Si falló, la pestaña ya está abierta mostrando el PDF
         finalize();
       }
     }

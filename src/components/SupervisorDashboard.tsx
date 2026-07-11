@@ -923,6 +923,10 @@ export const SupervisorDashboard = () => {
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   setIsPrinting(true);
+                                  
+                                  // Abrir pestaña de inmediato para evitar el bloqueo del popup por seguridad
+                                  const printTab = window.open(`/api/packing/label/${o.mlId}`, '_blank');
+                                  
                                   try {
                                     const printRes = await fetch('/api/print', {
                                       method: 'POST',
@@ -930,21 +934,16 @@ export const SupervisorDashboard = () => {
                                       body: JSON.stringify({ mlId: o.mlId })
                                     });
                                     if (printRes.ok) {
+                                      if (printTab && !printTab.closed) {
+                                        printTab.close();
+                                      }
                                       setIsPrinting(false);
                                     } else {
-                                      // Fallback: abrir PDF en nueva pestaña
-                                      const tab = window.open(`/api/packing/label/${o.mlId}`, '_blank');
-                                      if (!tab || tab.closed) {
-                                        await showModalAlert('Impresión manual', 'Permite ventanas emergentes para ver la etiqueta.', 'warning');
-                                      }
+                                      console.warn('[Supervisor] Reimpresión directa falló, usando pestaña de fallback.');
                                       setIsPrinting(false);
                                     }
                                   } catch (err) {
                                     console.error('Error en reimpresión:', err);
-                                    const tab = window.open(`/api/packing/label/${o.mlId}`, '_blank');
-                                    if (!tab || tab.closed) {
-                                      await showModalAlert('Impresión manual', 'Permite ventanas emergentes para ver la etiqueta.', 'warning');
-                                    }
                                     setIsPrinting(false);
                                   }
                                 }}
