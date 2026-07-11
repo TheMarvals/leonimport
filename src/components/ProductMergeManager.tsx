@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Check, GitMerge, PackageSearch, Search, Warehouse, X } from 'lucide-react';
 import { showConfirmModal, showToast } from '@/lib/toast';
+import { marketplaceSkuAliases } from '@/lib/product-matching';
 
 type MergeProduct = {
   id: string;
@@ -14,6 +15,7 @@ type MergeProduct = {
   totalStock: number;
   listingCount: number;
   orderCount: number;
+  mlAliases: string[];
   score?: number;
   locations: Array<{ id: string; quantity: number; location: { aisle: string; section: string; level: string } }>;
   suppliers: Array<{ id: string; supplier: { name: string } }>;
@@ -21,7 +23,10 @@ type MergeProduct = {
 };
 
 function marketplaceSkus(product: MergeProduct) {
-  return [...new Set(product.marketplaceListings.map(listing => listing.sellerSku?.trim()).filter((sku): sku is string => !!sku))];
+  return [...new Set([
+    ...product.marketplaceListings.map(listing => listing.sellerSku?.trim()).filter((sku): sku is string => !!sku),
+    ...marketplaceSkuAliases(product.mlAliases),
+  ])];
 }
 
 function productMergeLabel(product: MergeProduct) {
@@ -52,7 +57,7 @@ function ProductOption({ product, selected, onClick }: { product: MergeProduct; 
       <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-bold uppercase text-wms-muted">
         <span>{product.totalStock} stock</span>
         <span>•</span>
-        <span>{product.listingCount} publicaciones</span>
+        <span>{product.listingCount} vínculos ML</span>
         <span>•</span>
         <span>{product.orderCount} órdenes</span>
       </div>
@@ -76,7 +81,7 @@ function ProductSummary({ product, role }: { product: MergeProduct; role: 'sourc
       <h3 className="mt-2 text-lg font-black leading-tight text-white">{product.name}</h3>
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl bg-black/20 p-2"><p className="text-[8px] uppercase text-wms-muted">Stock</p><p className="mt-1 font-black">{product.totalStock}</p></div>
-        <div className="rounded-xl bg-black/20 p-2"><p className="text-[8px] uppercase text-wms-muted">Public.</p><p className="mt-1 font-black">{product.listingCount}</p></div>
+        <div className="rounded-xl bg-black/20 p-2"><p className="text-[8px] uppercase text-wms-muted">Vínculos ML</p><p className="mt-1 font-black">{product.listingCount}</p></div>
         <div className="rounded-xl bg-black/20 p-2"><p className="text-[8px] uppercase text-wms-muted">Órdenes</p><p className="mt-1 font-black">{product.orderCount}</p></div>
       </div>
       <div className="mt-4 space-y-2 text-xs text-wms-muted">
@@ -90,6 +95,8 @@ function ProductSummary({ product, role }: { product: MergeProduct; role: 'sourc
                 <span className="font-mono font-black text-amber-300">{listing.sellerSku || 'Sin seller SKU'}</span>
                 <span className="ml-2">{listing.title}</span>
               </p>
+            )) : mlSkus.length ? mlSkus.map(sku => (
+              <p key={sku} className="rounded-lg bg-black/20 px-2.5 py-2 font-mono font-black text-amber-300">{sku}</p>
             )) : <p className="text-wms-muted">Sin publicaciones vinculadas</p>}
           </div>
         </div>

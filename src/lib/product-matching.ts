@@ -10,6 +10,18 @@ export function normalizeMarketplaceCode(value?: string | null): string {
   return normalizeProductCode(value).replace(/^0+(?=\d)/, '');
 }
 
+export function marketplaceSkuAliases(aliases?: string[] | null): string[] {
+  return [...new Set((aliases || [])
+    .map(alias => alias.trim())
+    .filter(alias =>
+      alias.length >= 3 &&
+      alias.length <= 64 &&
+      !/\s/.test(alias) &&
+      /\d/.test(alias) &&
+      !/^https?:/i.test(alias)
+    ))];
+}
+
 export function normalizeProductName(value?: string | null): string {
   return (value || '')
     .normalize('NFD')
@@ -26,6 +38,7 @@ export function productMatchScore(
     brand?: string | null;
     color?: string | null;
     size?: string | null;
+    mlAliases?: string[];
     marketplaceListings?: Array<{ sellerSku?: string | null }>;
   },
   candidate: {
@@ -34,15 +47,18 @@ export function productMatchScore(
     brand?: string | null;
     color?: string | null;
     size?: string | null;
+    mlAliases?: string[];
     marketplaceListings?: Array<{ sellerSku?: string | null }>;
   },
 ): number {
-  const sourceMlSkus = [...new Set((source.marketplaceListings || [])
-    .map(listing => normalizeMarketplaceCode(listing.sellerSku))
-    .filter(Boolean))];
-  const candidateMlSkus = [...new Set((candidate.marketplaceListings || [])
-    .map(listing => normalizeMarketplaceCode(listing.sellerSku))
-    .filter(Boolean))];
+  const sourceMlSkus = [...new Set([
+    ...(source.marketplaceListings || []).map(listing => listing.sellerSku || ''),
+    ...marketplaceSkuAliases(source.mlAliases),
+  ].map(normalizeMarketplaceCode).filter(Boolean))];
+  const candidateMlSkus = [...new Set([
+    ...(candidate.marketplaceListings || []).map(listing => listing.sellerSku || ''),
+    ...marketplaceSkuAliases(candidate.mlAliases),
+  ].map(normalizeMarketplaceCode).filter(Boolean))];
 
   let marketplaceSkuScore = 0;
   for (const sourceSku of sourceMlSkus) {

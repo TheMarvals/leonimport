@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
-import { productMatchScore } from '@/lib/product-matching';
+import { marketplaceSkuAliases, productMatchScore } from '@/lib/product-matching';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ function summarizeProduct(product: any, score?: number) {
     ...product,
     score,
     totalStock: product.locations.reduce((total: number, location: any) => total + location.quantity, 0),
-    listingCount: product.marketplaceListings.length,
+    listingCount: Math.max(product.marketplaceListings.length, marketplaceSkuAliases(product.mlAliases).length),
     orderCount: product._count.orderItems,
   };
 }
@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
         brand: true,
         color: true,
         size: true,
+        mlAliases: true,
         marketplaceListings: { select: { sellerSku: true } },
       },
       orderBy: { updatedAt: 'desc' },
