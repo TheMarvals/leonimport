@@ -2,8 +2,11 @@ import { prisma } from './prisma';
 import RedisManager from './redis';
 import { fetchPendingOrders, fetchSingleOrder } from './mercadolibre';
 import { generateSku, extractFamilyBase } from './sku-generator';
+import { normalizeProductCode } from './product-matching';
 
 type RawItem = {
+  listingId?: string;
+  variationId?: string;
   sku?: string;
   title?: string;
   quantity: number;
@@ -134,7 +137,7 @@ async function resolveItems(
   // --- OPTIMIZACIÓN: Batch lookup de productos por SKU ---
   const uniqueSkus = [...new Set(rawItems.map(i => i.sku).filter((s): s is string => s !== undefined && s !== ''))];
   const foundProducts = uniqueSkus.length > 0
-    ? await prisma.product.findMany({ where: { sku: { in: uniqueSkus } } })
+    ? await prisma.product.findMany({ where: { sku: { in: uniqueSkus }, isActive: true } })
     : [];
   const productBySku = new Map(foundProducts.map(p => [p.sku, p]));
 
@@ -145,8 +148,23 @@ async function resolveItems(
     const itemTitle = rawItem.title;
     const itemLabel = itemTitle || itemSku || '(sin nombre)';
 
+    // Paso 0: una publicación/variación ya vinculada siempre tiene prioridad.
+    const listing = rawItem.listingId ? await prisma.marketplaceListing.findUnique({
+      where: {
+        marketplace_accountId_listingId_variationId: {
+          marketplace: 'MERCADOLIBRE',
+          accountId: process.env.ML_ACCOUNT_ID || 'default',
+          listingId: rawItem.listingId,
+          variationId: rawItem.variationId || ''
+        }
+      },
+      include: { product: true }
+    }) : null;
+
+    let product: any = listing?.product?.isActive ? listing.product : null;
+
     // Paso 1: Buscar por SKU directo (desde el Map ya cargado)
-    let product: any = itemSku ? productBySku.get(itemSku) ?? null : null;
+    if (!product) product = itemSku ? productBySku.get(itemSku) ?? null : null;
 
     if (product) {
       reusedSku++;
@@ -173,7 +191,7 @@ async function resolveItems(
       }
       if (orConditions.length > 0) {
         product = await prisma.product.findFirst({
-          where: { OR: orConditions, NOT: { sku: { startsWith: 'ML-MISSING' } } }
+          where: { OR: orConditions, isActive: true, NOT: { sku: { startsWith: 'ML-MISSING' } } }
         });
       }
       if (product) {
@@ -256,6 +274,45 @@ async function resolveItems(
         });
         console.log(`[Resolve] ❓ ML-MISSING ${missingSku} ← ${itemLabel} (familia 9000 sin clasificar)`);
         missingCreated++;
+      }
+    }
+
+    // Registrar la publicación como identidad estable del producto. En futuros
+    // syncs esta asociación gana sobre SKU y título.
+    if (rawItem.listingId && product) {
+      await prisma.marketplaceListing.upsert({
+        where: {
+          marketplace_accountId_listingId_variationId: {
+            marketplace: 'MERCADOLIBRE',
+            accountId: process.env.ML_ACCOUNT_ID || 'default',
+            listingId: rawItem.listingId,
+            variationId: rawItem.variationId || ''
+          }
+        },
+        update: {
+          sellerSku: itemSku || null,
+          normalizedSku: normalizeProductCode(itemSku) || null,
+          title: itemTitle || product.name
+        },
+        create: {
+          marketplace: 'MERCADOLIBRE',
+          accountId: process.env.ML_ACCOUNT_ID || 'default',
+          listingId: rawItem.listingId,
+          variationId: rawItem.variationId || '',
+          sellerSku: itemSku || null,
+          normalizedSku: normalizeProductCode(itemSku) || null,
+          title: itemTitle || product.name,
+          productId: product.id,
+          confidence: listing ? listing.confidence : 100,
+          linkSource: listing ? listing.linkSource : (itemSku && product.sku === itemSku ? 'EXACT_SKU' : 'SYNC')
+        }
+      });
+
+      if (itemSku && itemSku !== product.sku && !product.mlAliases.includes(itemSku)) {
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { mlAliases: { push: itemSku } }
+        });
       }
     }
 

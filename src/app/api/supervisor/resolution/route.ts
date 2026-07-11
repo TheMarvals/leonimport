@@ -89,7 +89,10 @@ export async function POST(req: Request) {
 
     const result = await prisma.$transaction(async (tx) => {
       // 0. Obtener el producto fantasma para guardar su alias y nombre
-      const ghost = await tx.product.findUnique({ where: { id: ghostProductId } });
+      const ghost = await tx.product.findUnique({
+        where: { id: ghostProductId },
+        include: { marketplaceListings: true }
+      });
       if (!ghost) throw new Error('Ghost product not found');
 
       const ghostName = ghost.name.trim();
@@ -158,6 +161,11 @@ export async function POST(req: Request) {
         }
       }
 
+      await tx.marketplaceListing.updateMany({
+        where: { productId: ghostProductId },
+        data: { productId: realProductId, linkSource: 'MANUAL_RESOLUTION', confidence: 100 }
+      });
+
       // ============================================================
       // 2. VINCULACIÓN MASIVA: buscar TODOS los OrderItems en TODAS 
       //    las órdenes que apunten a OTROS productos fantasma con el MISMO 
@@ -168,7 +176,8 @@ export async function POST(req: Request) {
           sku: { startsWith: 'ML-MISSING' },
           name: ghostName,
           id: { not: ghostProductId }  // excluir el que ya resolvimos
-        }
+        },
+        include: { marketplaceListings: true }
       });
 
       for (const otherGhost of allSameNameGhosts) {
@@ -207,6 +216,11 @@ export async function POST(req: Request) {
           }
           affectedOrderIds.add(sibling.orderId);
         }
+
+        await tx.marketplaceListing.updateMany({
+          where: { productId: otherGhost.id },
+          data: { productId: realProductId, linkSource: 'MANUAL_RESOLUTION', confidence: 100 }
+        });
 
         // Eliminar el fantasma hermano incondicionalmente, ya que movimos todos sus items
         await tx.product.delete({ where: { id: otherGhost.id } });
@@ -260,4 +274,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

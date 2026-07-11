@@ -86,6 +86,7 @@ export type MlOrderItem = {
     seller_sku?: string;
   };
   quantity: number;
+  variation_id?: number | null;
   unit_price: number;
   sale_fee: number;
 };
@@ -462,6 +463,8 @@ export async function fetchPendingOrders(limit: number = 50, offset: number = 0)
       const categoryId = mlItem.id ? (itemCategoryCache.get(mlItem.id) ?? null) : null;
       const categoryPath = categoryId ? (categoryPathCache.get(categoryId) ?? null) : null;
       return {
+        listingId: mlItem.id,
+        variationId: item.variation_id ? String(item.variation_id) : '',
         sku: mlItem.seller_sku || '',
         title: mlItem.title,
         quantity: item.quantity || 0,
@@ -598,6 +601,8 @@ export async function fetchSingleOrder(mlOrderId: number | bigint): Promise<MlSh
     const categoryId = mlItem.id ? (itemCategoryCache.get(mlItem.id) ?? null) : null;
     const categoryPath = categoryId ? (categoryPathCache.get(categoryId) ?? null) : null;
     return {
+      listingId: mlItem.id,
+      variationId: item.variation_id ? String(item.variation_id) : '',
       sku: mlItem.seller_sku || '',
       title: mlItem.title,
       quantity: item.quantity || 0,

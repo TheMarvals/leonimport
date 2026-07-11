@@ -9,15 +9,25 @@ export async function GET(req: NextRequest) {
   }
 
   const history = await prisma.order.findMany({
-    where: { status: 'SHIPPED' },
-    orderBy: { shippedAt: 'desc' },
-    take: 50,
+    // shippedAt es la marca autoritativa escrita por una mesa al despachar.
+    // El OR conserva órdenes históricas sincronizadas desde MercadoLibre.
+    where: {
+      OR: [
+        { shippedAt: { not: null } },
+        { status: 'SHIPPED' }
+      ]
+    },
+    orderBy: [{ shippedAt: 'desc' }, { updatedAt: 'desc' }],
+    take: 100,
     include: {
+      cubicle: true,
       items: {
         include: { product: true }
       }
     }
   });
 
-  return NextResponse.json(history);
+  return NextResponse.json(history, {
+    headers: { 'Cache-Control': 'no-store, max-age=0' }
+  });
 }

@@ -16,6 +16,7 @@ export async function GET() {
       ],
     },
     include: {
+      cubicle: true,
       items: {
         include: {
           product: true
@@ -90,17 +91,29 @@ export async function POST(req: NextRequest) {
         else finalPackingMethod = methods[0];
       }
 
-      await prisma.order.updateMany({
-        where: { id: { in: orderIds } },
-        data: { 
-          status: 'SHIPPED',
-          packedByUserId: session.userId,
-          packingStation: station || 'Mesa 1',
-          packingMethod: finalPackingMethod,
-          shippedAt: new Date(),
-          lockedBy: null,
-          lockExpiresAt: null
-        }
+      const shippedAt = new Date();
+      await prisma.$transaction(async tx => {
+        await tx.order.updateMany({
+          where: { id: { in: orderIds } },
+          data: {
+            status: 'SHIPPED',
+            packedByUserId: session.userId,
+            packingStation: station || 'Mesa 1',
+            packingMethod: finalPackingMethod,
+            shippedAt,
+            lockedBy: null,
+            lockExpiresAt: null
+          }
+        });
+
+        await tx.auditLog.create({
+          data: {
+            orderId: sourceOrder.id,
+            userId: session.userId,
+            action: 'COMPLETE_PACKING',
+            metadata: { station: station || 'Mesa 1', methods: methods || [], orderIds }
+          }
+        });
       });
 
       const order = await prisma.order.findUnique({ where: { id: orderId } });

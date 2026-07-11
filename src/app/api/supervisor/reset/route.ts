@@ -20,7 +20,9 @@ export async function POST(req: NextRequest) {
         lockExpiresAt: null,
         packedByUserId: null,
         packingStation: null,
-        shippedAt: null
+        shippedAt: null,
+        cubicleId: null,
+        cubicleNumber: null
       }
     });
 

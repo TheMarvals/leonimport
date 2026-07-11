@@ -41,12 +41,40 @@ model Product {
   currency   String            @default("CLP")
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
+  isActive       Boolean           @default(true)
+  mergedIntoId   String?
+  mergedInto     Product?          @relation("ProductMerge", fields: [mergedIntoId], references: [id])
+  mergedProducts Product[]         @relation("ProductMerge")
   mlAliases      String[]          @default([])
   categoryFamily Int?                                   // 1000, 5000, 11000, etc.
   mlCategoryPath String?                                // "Belleza > Maquillaje > Labiales"
   orderItems     OrderItem[]
   locations      ProductLocation[]
   suppliers      ProductSupplier[]
+  marketplaceListings MarketplaceListing[]
+
+  @@index([mergedIntoId])
+}
+
+model MarketplaceListing {
+  id            String   @id @default(uuid())
+  marketplace   String   @default("MERCADOLIBRE")
+  accountId     String   @default("default")
+  listingId     String
+  variationId   String   @default("")
+  sellerSku     String?
+  normalizedSku String?
+  title         String
+  productId     String
+  confidence    Int      @default(100)
+  linkSource    String   @default("SYNC")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@unique([marketplace, accountId, listingId, variationId])
+  @@index([productId])
+  @@index([normalizedSku])
 }
 
 model ProductSupplier {
@@ -71,6 +99,15 @@ model Location {
   sequenceIndex Int
   isActive      Boolean           @default(true)
   products      ProductLocation[]
+}
+
+model Cubicle {
+  id        String   @id @default(uuid())
+  number    Int      @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
 }
 
 model ProductLocation {
@@ -102,8 +139,13 @@ model Order {
   buyerName      String?
   pickingMethod  String?
   packingMethod  String?
+  cubicleId      String?
+  cubicleNumber  Int?
+  cubicle        Cubicle?   @relation(fields: [cubicleId], references: [id], onDelete: SetNull)
   auditLogs      AuditLog[]
   items          OrderItem[]
+
+  @@index([cubicleId])
 }
 
 model OrderItem {

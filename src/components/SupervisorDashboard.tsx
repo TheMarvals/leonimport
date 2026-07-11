@@ -20,7 +20,8 @@ import {
   Scan,
   Camera,
   Hand,
-  Shuffle
+  Shuffle,
+  Grid3X3
 } from 'lucide-react';
 import { getHighResImageUrl } from '@/lib/image-utils';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
@@ -262,6 +263,7 @@ export const SupervisorDashboard = () => {
       'START_PACKING': 'Inicio de Packing',
       'COMPLETE_PACKING': 'Packing Completado',
       'CANCEL_PACKING': 'Packing Cancelado',
+      'MERGE_PRODUCTS': 'Productos Fusionados',
     };
     return labels[action] || action;
   };
@@ -680,6 +682,13 @@ export const SupervisorDashboard = () => {
             
             <div className="overflow-hidden border-2 border-white/10 rounded-xl md:rounded-2xl flex-1 flex flex-col min-h-[300px] md:min-h-0 bg-black">
               <div className="overflow-auto custom-scrollbar flex-1 min-h-0">
+                {shippedHistory.length === 0 && (
+                  <div className="flex min-h-[260px] flex-col items-center justify-center p-8 text-center">
+                    <Package size={48} className="mb-4 text-white/10" />
+                    <p className="font-black uppercase tracking-wider text-white/50">Sin órdenes despachadas</p>
+                    <p className="mt-2 text-xs text-wms-muted">Las órdenes aparecerán aquí cuando una mesa finalice el packing.</p>
+                  </div>
+                )}
                 {/* VISTA MÓVIL: LISTA COMPACTA */}
                 <div className="md:hidden flex flex-col divide-y-2 divide-white/5">
                   {(() => {
@@ -712,7 +721,7 @@ export const SupervisorDashboard = () => {
                           </div>
                           <div className="flex items-center gap-1.5 text-[10px] font-mono text-wms-muted">
                             <Clock size={10} />
-                            {new Date(o.shippedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {o.shippedAt ? new Date(o.shippedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sync ML'}
                           </div>
                         </div>
 
@@ -742,10 +751,17 @@ export const SupervisorDashboard = () => {
                           })}
                         </div>
 
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-wms-card border border-wms-border/60 text-white/80">
-                            {o.packingStation || 'Sincronizado ML'}
-                          </span>
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-wms-card border border-wms-border/60 text-white/80">
+                              {o.packingStation || 'Sincronizado ML'}
+                            </span>
+                            {(o.cubicleNumber || o.cubicle) && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[9px] font-black uppercase text-amber-400">
+                                <Grid3X3 size={9} /> C{o.cubicleNumber ?? o.cubicle.number}
+                              </span>
+                            )}
+                          </div>
                           <button 
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -787,8 +803,14 @@ export const SupervisorDashboard = () => {
                 {/* VISTA ESCRITORIO: TABLA */}
                 <table className="hidden md:table w-full text-left border-collapse table-auto min-w-[800px]">
                   <thead className="bg-wms-bg sticky top-0 z-10 shadow-2xl border-b-2 border-white/10">
+                    <tr>
+                      <th className="p-5 text-[10px] font-black uppercase tracking-widest text-wms-muted">Hora</th>
+                      <th className="p-5 text-[10px] font-black uppercase tracking-widest text-wms-muted">Orden</th>
+                      <th className="p-5 text-[10px] font-black uppercase tracking-widest text-wms-muted">Productos</th>
+                      <th className="p-5 text-center text-[10px] font-black uppercase tracking-widest text-wms-muted">Mesa / Cubículo</th>
+                    </tr>
                   </thead>
-                      <tbody className="divide-y-2 divide-white/5">
+                  <tbody className="divide-y-2 divide-white/5">
                     {(() => {
                       const filteredHistory = shippedHistory
                         .filter(order => {
@@ -809,7 +831,7 @@ export const SupervisorDashboard = () => {
                           <td className="p-5 whitespace-nowrap">
                             <div className="flex items-center gap-2 text-xs font-semibold text-wms-muted font-mono group-hover:text-white transition-colors">
                               <Clock size={12} className="text-wms-muted group-hover:text-leon-red-light transition-colors" />
-                              {new Date(o.shippedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {o.shippedAt ? new Date(o.shippedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sync ML'}
                             </div>
                           </td>
                           <td className="p-5 whitespace-nowrap">
@@ -868,6 +890,11 @@ export const SupervisorDashboard = () => {
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-wms-card border border-wms-border/60 text-white/90 shadow-sm group-hover:border-leon-red/40 group-hover:text-leon-red-light transition-all">
                                 {o.packingStation || 'Sincronizado ML'}
                               </span>
+                              {(o.cubicleNumber || o.cubicle) && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase text-amber-400">
+                                  <Grid3X3 size={11} /> Cubículo {o.cubicleNumber ?? o.cubicle.number}
+                                </span>
+                              )}
                               
                               {/* Icons for Picking and Packing methods */}
                               {(o.pickingMethod || o.packingMethod) && (

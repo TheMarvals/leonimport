@@ -229,10 +229,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'COMPLETE_PICKING') {
+      const { cubicleId } = body;
+      if (!cubicleId) {
+        return NextResponse.json({ error: 'Debes seleccionar un cubículo antes de finalizar' }, { status: 400 });
+      }
+
       const sourceOrder = await prisma.order.findUnique({
         where: { id: orderId }
       });
       if (!sourceOrder) return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 });
+      if (sourceOrder.status !== 'PICKING' || sourceOrder.lockedBy !== session.userId) {
+        return NextResponse.json({ error: 'Esta recolección ya no pertenece a tu sesión' }, { status: 409 });
+      }
 
       const orderIds = sourceOrder.shippingId
         ? (await prisma.order.findMany({
@@ -254,14 +262,43 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      await prisma.order.updateMany({
-        where: { id: { in: orderIds } },
-        data: { 
-          status: 'PACKING',
-          lockedBy: null, // Liberamos el lock para que un Packer lo tome
-          lockExpiresAt: null
+      await prisma.$transaction(async tx => {
+        const cubicle = await tx.cubicle.findUnique({ where: { id: cubicleId } });
+        if (!cubicle || !cubicle.isActive) {
+          throw new Error('CUBICLE_UNAVAILABLE');
         }
-      });
+
+        const occupied = await tx.order.findFirst({
+          where: {
+            cubicleId,
+            status: 'PACKING',
+            lockedBy: null,
+            id: { notIn: orderIds }
+          },
+          select: { id: true }
+        });
+        if (occupied) throw new Error('CUBICLE_OCCUPIED');
+
+        await tx.order.updateMany({
+          where: { id: { in: orderIds } },
+          data: {
+            status: 'PACKING',
+            cubicleId,
+            cubicleNumber: cubicle.number,
+            lockedBy: null,
+            lockExpiresAt: null
+          }
+        });
+
+        await tx.auditLog.create({
+          data: {
+            orderId: sourceOrder.id,
+            userId: session.userId,
+            action: 'COMPLETE_PICKING',
+            metadata: { cubicleNumber: cubicle.number, orderIds }
+          }
+        });
+      }, { isolationLevel: 'Serializable' });
 
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       return NextResponse.json(order);
@@ -374,7 +411,9 @@ export async function POST(req: NextRequest) {
             status: 'PENDING',
             lockedBy: null,
             lockExpiresAt: null,
-            pickingMethod: null
+            pickingMethod: null,
+            cubicleId: null,
+            cubicleNumber: null
           }
         });
 
@@ -399,6 +438,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (error: any) {
     console.error('Picking Action Error:', error);
+    if (error?.message === 'CUBICLE_OCCUPIED') {
+      return NextResponse.json({ error: 'Ese cubículo acaba de ser ocupado. Selecciona otro.' }, { status: 409 });
+    }
+    if (error?.message === 'CUBICLE_UNAVAILABLE') {
+      return NextResponse.json({ error: 'El cubículo seleccionado ya no está disponible' }, { status: 409 });
+    }
+    if (error?.code === 'P2034') {
+      return NextResponse.json({ error: 'Otro operario ocupó ese cubículo. Selecciona otro.' }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Ocurrió un error o la orden ya está en proceso por otro usuario' }, { status: 500 });
   }
 }

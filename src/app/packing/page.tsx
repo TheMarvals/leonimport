@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Box, CheckCircle, Search, Printer, Scan, ChevronRight, Camera, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Box, CheckCircle, Search, Printer, Scan, ChevronRight, Camera, AlertTriangle, Grid3X3 } from 'lucide-react';
 import { getHighResImageUrl } from '@/lib/image-utils';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -14,6 +14,7 @@ interface Product {
   sku: string;
   name: string;
   imageUrl: string | null;
+  mlAliases: string[];
 }
 
 interface OrderItem {
@@ -33,6 +34,8 @@ interface Order {
   isFlex: boolean;
   priorityMessage: string | null;
   buyerName: string | null;
+  cubicle: { id: string; number: number } | null;
+  cubicleNumber: number | null;
   items: OrderItem[];
 }
 
@@ -117,6 +120,8 @@ export default function PackingPage() {
           isFlex: sortedGroup.some(o => o.isFlex),
           priorityMessage: sortedGroup.find(o => o.priorityMessage)?.priorityMessage || primary.priorityMessage,
           buyerName: sortedGroup.map(o => o.buyerName).filter(Boolean).join(' / ') || primary.buyerName,
+          cubicle: primary.cubicle,
+          cubicleNumber: primary.cubicleNumber,
           items: mergedItems,
         };
         groups.push(mergedOrder);
@@ -201,7 +206,11 @@ export default function PackingPage() {
 
   const handleScan = useCallback((sku: string, method: 'SCANNER' | 'CAMERA' = 'SCANNER') => {
     if (!activeOrder) return;
-    const item = activeOrder.items.find(i => i.product.sku.toLowerCase() === sku.toLowerCase());
+    const normalizedCode = sku.toLowerCase();
+    const item = activeOrder.items.find(i =>
+      i.product.sku.toLowerCase() === normalizedCode ||
+      (i.product.mlAliases || []).some(alias => alias.toLowerCase() === normalizedCode)
+    );
     if (item) {
       setLastScannedItem(item);
       packItem(item.id, method);
@@ -244,6 +253,7 @@ export default function PackingPage() {
           fullOrder.items.forEach(i => initialCounts[i.id] = 0);
           setPackedQuantities(initialCounts);
           setPackingMethods([]);
+          queryClient.invalidateQueries({ queryKey: ['cubicles'] });
         }
       } else {
         showToast('La orden ya fue tomada por otro usuario.', 'error');
@@ -518,6 +528,13 @@ export default function PackingPage() {
                     {o.status}
                   </span>
                 </div>
+                <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+                  <Grid3X3 size={20} className="shrink-0 text-amber-400" />
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/70">Retirar desde</p>
+                    <p className="font-black text-white">Cubículo {o.cubicleNumber ?? o.cubicle?.number ?? 'sin asignar'}</p>
+                  </div>
+                </div>
                 <button onClick={() => startPacking(o.id)} className="w-full bg-leon-red hover:bg-leon-red-light text-white py-4 rounded-xl font-black text-lg transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(155,27,48,0.2)]">
                   <Box size={20} /> COMENZAR EMPAQUE
                 </button>
@@ -542,6 +559,7 @@ export default function PackingPage() {
         <div className="min-w-0">
           <h2 className="text-xs md:text-lg font-black text-wms-muted uppercase tracking-widest leading-none mb-1">Auditoría de Orden</h2>
           <p className="text-leon-red font-black text-lg md:text-xl italic tracking-tighter truncate">ML-{activeOrder.mlId}</p>
+          <p className="mt-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-400"><Grid3X3 size={11} /> Retirada del cubículo {activeOrder.cubicleNumber ?? activeOrder.cubicle?.number ?? '—'}</p>
         </div>
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
           <button 

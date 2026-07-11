@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, Package, CheckCircle, AlertTriangle, Scan, Search, ChevronRight, Camera, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Package, CheckCircle, AlertTriangle, Scan, Search, ChevronRight, Camera, RefreshCw, Grid3X3 } from 'lucide-react';
 import { getHighResImageUrl } from '@/lib/image-utils';
 import { showToast, showConfirmModal } from '@/lib/toast';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -73,6 +73,13 @@ interface Order {
   items: OrderItem[];
 }
 
+interface Cubicle {
+  id: string;
+  number: number;
+  occupied: boolean;
+  order: { id: string; mlId: string; shippingId: string | null } | null;
+}
+
 export default function PickingPage() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -84,6 +91,7 @@ export default function PickingPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [pickingSearchTerm, setPickingSearchTerm] = useState('');
   const [refreshingOrder, setRefreshingOrder] = useState<string | null>(null);
+  const [selectedCubicleId, setSelectedCubicleId] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -93,6 +101,17 @@ export default function PickingPage() {
     queryFn: () => fetch('/api/picking').then(r => r.json()),
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000, // Auto-refresh cada 30s
+  });
+
+  const { data: cubicles = [], isLoading: cubiclesLoading, refetch: refetchCubicles } = useQuery<Cubicle[]>({
+    queryKey: ['cubicles', 'available'],
+    queryFn: async () => {
+      const response = await fetch('/api/cubicles');
+      if (!response.ok) throw new Error('No se pudieron cargar los cubículos');
+      return response.json();
+    },
+    enabled: !!activeOrder,
+    staleTime: 5 * 1000,
   });
 
   // Agrupar órdenes por shippingId (si no es nulo) para mostrarlas y procesarlas juntas
@@ -310,6 +329,7 @@ export default function PickingPage() {
       await pickingMutation.mutateAsync({ action: 'START_PICKING', orderId });
       const fullOrder = groupedOrdersList.find(o => o.id === orderId);
       if (fullOrder) {
+        setSelectedCubicleId('');
         setCurrentItemIndex(getResumeItemIndex(fullOrder));
         setActiveOrder({ ...fullOrder, status: 'PICKING' });
       }
@@ -352,6 +372,7 @@ export default function PickingPage() {
         })
       );
       setActiveOrder(null);
+      setSelectedCubicleId('');
       setCurrentItemIndex(0);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       showToast('Recolección reiniciada. La orden volvió a su estado inicial.', 'info');
@@ -362,11 +383,26 @@ export default function PickingPage() {
 
   const completePicking = async () => {
     if (!activeOrder) return;
+    if (!selectedCubicleId) {
+      showToast('Selecciona el cubículo donde dejarás la orden.', 'warning');
+      return;
+    }
     try {
-      await pickingMutation.mutateAsync({ action: 'COMPLETE_PICKING', orderId: activeOrder.id });
+      await pickingMutation.mutateAsync({
+        action: 'COMPLETE_PICKING',
+        orderId: activeOrder.id,
+        cubicleId: selectedCubicleId
+      });
       setActiveOrder(null);
+      setSelectedCubicleId('');
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-    } catch {}
+      queryClient.invalidateQueries({ queryKey: ['cubicles'] });
+      showToast('Orden enviada a packing con cubículo asignado.', 'success');
+    } catch (error: any) {
+      showToast(error.message || 'No se pudo finalizar el picking.', 'error');
+      setSelectedCubicleId('');
+      refetchCubicles();
+    }
   };
 
   // Ordenar los ítems de la orden activa por la ubicación S-Shape más cercana
@@ -416,7 +452,7 @@ export default function PickingPage() {
   const preferredLoc = currentGroupItem?.product.locations.find(l => l.quantity > 0);
   const currentTotalStock = currentGroupItem?.product.locations?.reduce((acc: number, l: any) => acc + l.quantity, 0) || 0;
 
-  const pickItem = async (quantityToPick: number, method: 'SCANNER' | 'CAMERA' | 'MANUAL' = 'MANUAL') => {
+  const pickItem = useCallback(async (quantityToPick: number, method: 'SCANNER' | 'CAMERA' | 'MANUAL' = 'MANUAL') => {
     if (!activeOrder || !currentGroupItem) return;
 
     // Bloquear recolección si el stock total en sistema es 0
@@ -473,7 +509,7 @@ export default function PickingPage() {
         }
       }, 600);
     }
-  };
+  }, [activeOrder, currentGroupItem, currentItemIndex, currentTotalStock, groupedItems.length, preferredLoc]);
 
   const handleScan = useCallback((code: string, method: 'SCANNER' | 'CAMERA' = 'SCANNER') => {
     if (!activeOrder) return;
@@ -740,11 +776,7 @@ export default function PickingPage() {
               className="text-wms-muted hover:text-leon-red text-[9px] md:text-[10px] font-black uppercase transition-colors px-3 py-2 md:px-4 md:py-2 border border-wms-border hover:border-leon-red/30 rounded-lg md:rounded-xl">
               Salir
             </button>
-            {isOrderComplete && (
-              <button onClick={completePicking} className="bg-green-600 hover:bg-green-500 text-white px-4 md:px-8 py-2 md:py-3 rounded-lg md:rounded-2xl font-black text-xs md:text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-600/20 uppercase tracking-widest">
-                Fin <CheckCircle size={16} />
-              </button>
-            )}
+            {isOrderComplete && <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-amber-400 md:text-xs">Asignar cubículo</span>}
           </div>
         </div>
 
@@ -782,16 +814,60 @@ export default function PickingPage() {
         )}
 
         {isOrderComplete ? (
-          <div className="text-center space-y-8 animate-in fade-in zoom-in duration-500 w-full max-w-md px-4">
-            <div className="w-32 h-32 md:w-40 md:h-40 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-green-500/30">
-              <CheckCircle size={64} className="text-green-500 md:w-20 md:h-20" />
+          <div className="w-full max-w-xl space-y-6 px-1 text-center animate-in fade-in zoom-in duration-500 sm:px-4 md:space-y-8">
+            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border-2 border-green-500/30 bg-green-500/10 md:h-32 md:w-32">
+              <CheckCircle size={52} className="text-green-500 md:h-16 md:w-16" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-4xl md:text-5xl font-black text-white italic tracking-tighter">¡COMPLETADO!</h2>
-              <p className="text-wms-muted text-sm md:text-lg font-medium">Todos los productos han sido recolectados.</p>
+              <h2 className="text-3xl font-black italic tracking-tighter text-white md:text-5xl">¡PRODUCTOS LISTOS!</h2>
+              <p className="text-sm font-medium text-wms-muted md:text-lg">Indica dónde dejarás físicamente la orden.</p>
             </div>
-            <button onClick={completePicking} className="bg-green-600 hover:bg-green-500 text-white w-full py-5 md:py-6 rounded-2xl md:rounded-3xl font-black text-xl md:text-2xl flex items-center justify-center gap-4 transition-all active:scale-95 shadow-2xl shadow-green-600/30">
-              A PACKING <ChevronRight size={28} />
+
+            <div className="rounded-2xl border border-wms-border bg-wms-surface p-4 text-left md:p-5">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="rounded-xl bg-amber-500/10 p-2.5 text-amber-400"><Grid3X3 size={22} /></div>
+                <div>
+                  <h3 className="font-black text-white">Selecciona un cubículo</h3>
+                  <p className="text-xs text-wms-muted">Los ocupados no pueden seleccionarse.</p>
+                </div>
+              </div>
+
+              {cubiclesLoading ? (
+                <p className="py-5 text-center text-sm text-wms-muted">Cargando cubículos...</p>
+              ) : cubicles.length === 0 ? (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-center text-sm text-amber-300">
+                  No hay cubículos configurados. Solicita al administrador que agregue uno.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                  {cubicles.map(cubicle => (
+                    <button
+                      key={cubicle.id}
+                      type="button"
+                      disabled={cubicle.occupied}
+                      onClick={() => setSelectedCubicleId(cubicle.id)}
+                      className={`min-h-16 rounded-xl border text-lg font-black transition-all ${
+                        selectedCubicleId === cubicle.id
+                          ? 'border-green-400 bg-green-500 text-black shadow-lg shadow-green-500/20'
+                          : cubicle.occupied
+                            ? 'cursor-not-allowed border-wms-border bg-black/30 text-wms-muted/30'
+                            : 'border-wms-border bg-wms-card text-white hover:border-amber-500/60'
+                      }`}
+                    >
+                      <span className="block text-[8px] uppercase tracking-widest opacity-60">Cubículo</span>
+                      {cubicle.number}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={completePicking}
+              disabled={!selectedCubicleId}
+              className="flex w-full items-center justify-center gap-3 rounded-2xl bg-green-600 py-4 text-lg font-black text-white shadow-2xl shadow-green-600/30 transition-all hover:bg-green-500 active:scale-95 disabled:cursor-not-allowed disabled:bg-wms-border disabled:text-wms-muted disabled:shadow-none md:rounded-3xl md:py-5 md:text-xl"
+            >
+              CONFIRMAR Y ENVIAR A PACKING <ChevronRight size={24} />
             </button>
           </div>
         ) : (

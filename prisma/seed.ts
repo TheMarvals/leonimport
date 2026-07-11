@@ -62,6 +62,15 @@ async function main() {
     });
   }
 
+  // Cubículos de espera entre picking y packing
+  for (let number = 1; number <= 12; number++) {
+    await prisma.cubicle.upsert({
+      where: { number },
+      update: {},
+      create: { number },
+    });
+  }
+
   // Productos
   const products = [
     { sku: 'POL-00001', name: 'Polera Algodón Negra XL', salePrice: 12990 },

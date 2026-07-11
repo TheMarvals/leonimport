@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const categoryFilter = searchParams.get('category');
 
   const where: any = {
+    isActive: true,
     NOT: {
       sku: { startsWith: 'ML-MISSING-' }
     }

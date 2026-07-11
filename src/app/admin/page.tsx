@@ -4,12 +4,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Users, UserPlus, Shield, Key, Power, ArrowLeft, Save, Activity,
-  AlertCircle, Package, Search, Check
+  AlertCircle, Package, Search, Check, Grid3X3, Plus, Pencil, Trash2, X, GitMerge
 } from 'lucide-react';
 import Link from 'next/link';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
+import ProductMergeManager from '@/components/ProductMergeManager';
 
-type Tab = 'users' | 'ml-missing';
+type Tab = 'users' | 'cubicles' | 'duplicates' | 'ml-missing';
+
+type Cubicle = {
+  id: string;
+  number: number;
+  isActive: boolean;
+  occupied: boolean;
+  order: { id: string; mlId: string; shippingId: string | null } | null;
+};
 
 type GhostGroup = {
   name: string;
@@ -33,6 +42,10 @@ export default function AdminPage() {
   // ─── ML-MISSING state ───
   const [searchTerm, setSearchTerm] = useState('');
 
+  // ─── Cubicle state ───
+  const [newCubicleNumber, setNewCubicleNumber] = useState('');
+  const [editingCubicle, setEditingCubicle] = useState<{ id: string; number: string } | null>(null);
+
   // React Query: fetching de usuarios
   const { data: users = [], isLoading: loading } = useQuery({
     queryKey: ['admin', 'users'],
@@ -47,6 +60,17 @@ export default function AdminPage() {
     queryFn: () => fetch('/api/admin/ml-missing').then(r => r.json()),
     staleTime: 30 * 1000,
     enabled: tab === 'ml-missing',
+  });
+
+  const { data: cubicles = [], isLoading: cubiclesLoading } = useQuery<Cubicle[]>({
+    queryKey: ['cubicles'],
+    queryFn: async () => {
+      const response = await fetch('/api/cubicles');
+      if (!response.ok) throw new Error('No se pudieron cargar los cubículos');
+      return response.json();
+    },
+    staleTime: 10 * 1000,
+    enabled: tab === 'cubicles',
   });
 
   const ghostGroups: GhostGroup[] = ghostData?.items ?? [];
@@ -71,11 +95,62 @@ export default function AdminPage() {
     queryClient.invalidateQueries({ queryKey: ['admin', 'ml-missing'] });
   }, [queryClient]);
 
+  const fetchCubicles = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['cubicles'] });
+  }, [queryClient]);
+
   // ─── Effects ───
   useEffect(() => {
     if (tab === 'users') fetchUsers();
     if (tab === 'ml-missing') fetchGhosts();
-  }, [tab, fetchUsers, fetchGhosts]);
+    if (tab === 'cubicles') fetchCubicles();
+  }, [tab, fetchUsers, fetchGhosts, fetchCubicles]);
+
+  const saveCubicle = async (method: 'POST' | 'PUT') => {
+    const payload = method === 'POST'
+      ? { number: newCubicleNumber }
+      : { id: editingCubicle?.id, number: editingCubicle?.number };
+
+    try {
+      const response = await fetch('/api/cubicles', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo guardar el cubículo');
+
+      setNewCubicleNumber('');
+      setEditingCubicle(null);
+      fetchCubicles();
+      showToast(method === 'POST' ? 'Cubículo agregado.' : 'Cubículo actualizado.', 'success');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const deleteCubicle = async (cubicle: Cubicle) => {
+    const confirmation = await showConfirmModal(
+      `¿Eliminar el cubículo ${cubicle.number}?`,
+      'Dejará de aparecer como opción para nuevas recolecciones.',
+      'Sí, eliminar'
+    );
+    if (!confirmation.isConfirmed) return;
+
+    try {
+      const response = await fetch('/api/cubicles', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: cubicle.id })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo eliminar el cubículo');
+      fetchCubicles();
+      showToast('Cubículo eliminado.', 'info');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    }
+  };
 
   // Auto-generate SKU when creating new product
   useEffect(() => {
@@ -354,6 +429,18 @@ export default function AdminPage() {
           }`}>
           <AlertCircle size={16} className="md:w-[18px] md:h-[18px]" /> ML-MISSING ({ghostGroups.length})
         </button>
+        <button onClick={() => setTab('cubicles')}
+          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+            tab === 'cubicles' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
+          }`}>
+          <Grid3X3 size={16} className="md:w-[18px] md:h-[18px]" /> CUBÍCULOS ({cubicles.length})
+        </button>
+        <button onClick={() => setTab('duplicates')}
+          className={`shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+            tab === 'duplicates' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
+          }`}>
+          <GitMerge size={16} className="md:w-[18px] md:h-[18px]" /> DUPLICADOS
+        </button>
         <Link href="/admin/sync"
           className="shrink-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30 transition-all">
           <Activity size={16} className="md:w-[18px] md:h-[18px]" /> SYNC
@@ -396,6 +483,121 @@ export default function AdminPage() {
           </div>
         </>
       )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* TAB: CUBÍCULOS */}
+      {/* ═══════════════════════════════════════════ */}
+      {tab === 'cubicles' && (
+        <section className="space-y-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-lg font-black uppercase tracking-wider md:text-xl">Gestión de Cubículos</h2>
+              <p className="mt-1 max-w-2xl text-sm text-wms-muted">
+                El cubículo se ocupa al finalizar picking y se libera cuando una mesa comienza a empacar la orden.
+              </p>
+            </div>
+
+            <div className="flex w-full gap-2 md:w-auto">
+              <div className="relative min-w-0 flex-1 md:w-48">
+                <Grid3X3 className="absolute left-3 top-1/2 -translate-y-1/2 text-wms-muted" size={18} />
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={newCubicleNumber}
+                  onChange={event => setNewCubicleNumber(event.target.value)}
+                  onKeyDown={event => { if (event.key === 'Enter' && newCubicleNumber) saveCubicle('POST'); }}
+                  placeholder="Número"
+                  className="min-h-12 w-full rounded-xl border border-wms-border bg-wms-surface pl-10 pr-3 font-mono text-white outline-none focus:border-blue-500"
+                />
+              </div>
+              <button
+                onClick={() => saveCubicle('POST')}
+                disabled={!newCubicleNumber}
+                className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white transition-colors hover:bg-blue-500 disabled:opacity-40"
+              >
+                <Plus size={18} /> <span className="hidden sm:inline">AGREGAR</span>
+              </button>
+            </div>
+          </div>
+
+          {cubiclesLoading ? (
+            <div className="py-20 text-center font-bold text-wms-muted">Cargando cubículos...</div>
+          ) : cubicles.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-wms-border bg-wms-surface py-16 text-center">
+              <Grid3X3 size={48} className="mx-auto mb-4 text-wms-muted/30" />
+              <p className="font-bold text-white">No hay cubículos configurados</p>
+              <p className="mt-1 text-sm text-wms-muted">Agrega el primer número para habilitar el cierre de picking.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {cubicles.map(cubicle => (
+                <article key={cubicle.id} className={`rounded-2xl border p-5 transition-colors ${cubicle.occupied ? 'border-amber-500/40 bg-amber-500/5' : 'border-wms-border bg-wms-surface'}`}>
+                  {editingCubicle?.id === cubicle.id ? (
+                    <div className="space-y-4">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-wms-muted">Nuevo número</label>
+                      <input
+                        type="number"
+                        min="1"
+                        autoFocus
+                        value={editingCubicle.number}
+                        onChange={event => setEditingCubicle({ ...editingCubicle, number: event.target.value })}
+                        className="min-h-14 w-full rounded-xl border border-blue-500 bg-wms-bg px-4 text-center font-mono text-2xl font-black text-white outline-none"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setEditingCubicle(null)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-wms-border text-xs font-bold text-wms-muted"><X size={15} /> CANCELAR</button>
+                        <button onClick={() => saveCubicle('PUT')} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 text-xs font-black text-white"><Save size={15} /> GUARDAR</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-wms-muted">Cubículo</p>
+                          <p className="mt-1 font-mono text-4xl font-black text-white">{cubicle.number}</p>
+                        </div>
+                        <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${
+                          cubicle.occupied
+                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                            : 'border-green-500/30 bg-green-500/10 text-green-400'
+                        }`}>
+                          {cubicle.occupied ? 'Ocupado' : 'Disponible'}
+                        </span>
+                      </div>
+
+                      {cubicle.occupied && cubicle.order && (
+                        <div className="mt-4 rounded-xl border border-amber-500/20 bg-black/20 p-3">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-wms-muted">Esperando packing</p>
+                          <p className="mt-1 truncate font-mono text-xs font-bold text-amber-300">ML-{cubicle.order.mlId}</p>
+                        </div>
+                      )}
+
+                      <div className="mt-5 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setEditingCubicle({ id: cubicle.id, number: String(cubicle.number) })}
+                          disabled={cubicle.occupied}
+                          className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-wms-border text-xs font-bold text-white transition-colors hover:border-blue-500 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <Pencil size={15} /> EDITAR
+                        </button>
+                        <button
+                          onClick={() => deleteCubicle(cubicle)}
+                          disabled={cubicle.occupied}
+                          className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-bold text-red-400 transition-colors hover:border-red-500/50 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <Trash2 size={15} /> ELIMINAR
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === 'duplicates' && <ProductMergeManager />}
 
       {/* ═══════════════════════════════════════════ */}
       {/* TAB: ML-MISSING */}
