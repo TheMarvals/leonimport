@@ -20,7 +20,17 @@ type MergeProduct = {
   marketplaceListings: Array<{ id: string; listingId: string; variationId: string; sellerSku: string | null; title: string }>;
 };
 
+function marketplaceSkus(product: MergeProduct) {
+  return [...new Set(product.marketplaceListings.map(listing => listing.sellerSku?.trim()).filter((sku): sku is string => !!sku))];
+}
+
+function productMergeLabel(product: MergeProduct) {
+  const mlSkus = marketplaceSkus(product);
+  return mlSkus.length ? `ML ${mlSkus.join(' / ')} (interno ${product.sku})` : `interno ${product.sku}`;
+}
+
 function ProductOption({ product, selected, onClick }: { product: MergeProduct; selected?: boolean; onClick: () => void }) {
+  const mlSkus = marketplaceSkus(product);
   return (
     <button
       type="button"
@@ -29,7 +39,8 @@ function ProductOption({ product, selected, onClick }: { product: MergeProduct; 
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-mono text-[10px] font-black text-blue-400">{product.sku}</p>
+          <p className="truncate font-mono text-xs font-black text-amber-400">ML: {mlSkus.join(' · ') || 'SIN SKU ML'}</p>
+          <p className="mt-0.5 truncate font-mono text-[9px] font-bold text-wms-muted">INTERNO: {product.sku}</p>
           <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white">{product.name}</p>
         </div>
         {product.score !== undefined && (
@@ -51,6 +62,7 @@ function ProductOption({ product, selected, onClick }: { product: MergeProduct; 
 
 function ProductSummary({ product, role }: { product: MergeProduct; role: 'source' | 'target' }) {
   const isTarget = role === 'target';
+  const mlSkus = marketplaceSkus(product);
   return (
     <div className={`h-full rounded-2xl border p-5 ${isTarget ? 'border-green-500/35 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -59,7 +71,8 @@ function ProductSummary({ product, role }: { product: MergeProduct; role: 'sourc
         </span>
         {isTarget && <Check size={18} className="text-green-400" />}
       </div>
-      <p className="font-mono text-xs font-black text-white">{product.sku}</p>
+      <p className="font-mono text-sm font-black text-amber-400">ML: {mlSkus.join(' · ') || 'SIN SKU ML'}</p>
+      <p className="mt-1 font-mono text-[10px] font-bold text-wms-muted">SKU INTERNO: {product.sku}</p>
       <h3 className="mt-2 text-lg font-black leading-tight text-white">{product.name}</h3>
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl bg-black/20 p-2"><p className="text-[8px] uppercase text-wms-muted">Stock</p><p className="mt-1 font-black">{product.totalStock}</p></div>
@@ -69,6 +82,17 @@ function ProductSummary({ product, role }: { product: MergeProduct; role: 'sourc
       <div className="mt-4 space-y-2 text-xs text-wms-muted">
         <p><span className="font-bold text-white/70">Variación:</span> {[product.brand, product.color, product.size].filter(Boolean).join(' · ') || 'Sin atributos'}</p>
         <p><span className="font-bold text-white/70">Proveedores:</span> {product.suppliers.map(item => item.supplier.name).join(', ') || 'Ninguno'}</p>
+        <div>
+          <span className="font-bold text-white/70">Publicaciones ML:</span>
+          <div className="mt-2 space-y-1">
+            {product.marketplaceListings.length ? product.marketplaceListings.map(listing => (
+              <p key={listing.id} className="rounded-lg bg-black/20 px-2.5 py-2">
+                <span className="font-mono font-black text-amber-300">{listing.sellerSku || 'Sin seller SKU'}</span>
+                <span className="ml-2">{listing.title}</span>
+              </p>
+            )) : <p className="text-wms-muted">Sin publicaciones vinculadas</p>}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -125,7 +149,7 @@ export default function ProductMergeManager() {
   const merge = async () => {
     if (!source || !target) return;
     const confirmation = await showConfirmModal(
-      `¿Fusionar ${source.sku} dentro de ${target.sku}?`,
+      `¿Fusionar ${productMergeLabel(source)} dentro de ${productMergeLabel(target)}?`,
       `Se moverán ${source.totalStock} unidades, ${source.listingCount} publicaciones y ${source.orderCount} órdenes. El producto principal conservará su SKU y nombre.`,
       'Sí, fusionar'
     );
@@ -140,7 +164,7 @@ export default function ProductMergeManager() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'No se pudo completar el merge');
-      showToast(`${source.sku} fue fusionado correctamente dentro de ${target.sku}.`, 'success');
+      showToast(`${productMergeLabel(source)} fue fusionado correctamente dentro de ${productMergeLabel(target)}.`, 'success');
       reset();
     } catch (error: any) {
       showToast(error.message, 'error');
@@ -153,7 +177,7 @@ export default function ProductMergeManager() {
     <section className="space-y-6">
       <div>
         <h2 className="flex items-center gap-3 text-xl font-black uppercase tracking-tight text-white md:text-2xl"><GitMerge className="text-blue-400" /> Fusionar productos duplicados</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-wms-muted">Elige el producto duplicado y luego el producto principal. Las coincidencias parciales son sugerencias y siempre requieren confirmación.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-wms-muted">Elige el producto duplicado y luego el principal. Las sugerencias priorizan los seller SKU de MercadoLibre —incluidas variantes con ceros iniciales— y siempre requieren confirmación.</p>
       </div>
 
       {!source ? (
@@ -171,7 +195,7 @@ export default function ProductMergeManager() {
       ) : (
         <>
           <div className="flex items-center justify-between rounded-xl border border-red-500/20 bg-red-500/5 p-3">
-            <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-widest text-red-400">Producto a fusionar</p><p className="truncate text-sm font-bold text-white">{source.sku} · {source.name}</p></div>
+            <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-widest text-red-400">Producto a fusionar</p><p className="truncate text-sm font-bold text-white">{productMergeLabel(source)} · {source.name}</p></div>
             <button onClick={reset} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-wms-border text-wms-muted hover:text-white"><X size={17} /></button>
           </div>
 

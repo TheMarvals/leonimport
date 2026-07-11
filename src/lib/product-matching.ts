@@ -6,6 +6,10 @@ export function normalizeProductCode(value?: string | null): string {
     .replace(/[^A-Z0-9]/g, '');
 }
 
+export function normalizeMarketplaceCode(value?: string | null): string {
+  return normalizeProductCode(value).replace(/^0+(?=\d)/, '');
+}
+
 export function normalizeProductName(value?: string | null): string {
   return (value || '')
     .normalize('NFD')
@@ -16,20 +20,52 @@ export function normalizeProductName(value?: string | null): string {
 }
 
 export function productMatchScore(
-  source: { sku: string; name: string; brand?: string | null; color?: string | null; size?: string | null },
-  candidate: { sku: string; name: string; brand?: string | null; color?: string | null; size?: string | null },
+  source: {
+    sku: string;
+    name: string;
+    brand?: string | null;
+    color?: string | null;
+    size?: string | null;
+    marketplaceListings?: Array<{ sellerSku?: string | null }>;
+  },
+  candidate: {
+    sku: string;
+    name: string;
+    brand?: string | null;
+    color?: string | null;
+    size?: string | null;
+    marketplaceListings?: Array<{ sellerSku?: string | null }>;
+  },
 ): number {
+  const sourceMlSkus = [...new Set((source.marketplaceListings || [])
+    .map(listing => normalizeMarketplaceCode(listing.sellerSku))
+    .filter(Boolean))];
+  const candidateMlSkus = [...new Set((candidate.marketplaceListings || [])
+    .map(listing => normalizeMarketplaceCode(listing.sellerSku))
+    .filter(Boolean))];
+
+  let marketplaceSkuScore = 0;
+  for (const sourceSku of sourceMlSkus) {
+    for (const candidateSku of candidateMlSkus) {
+      if (sourceSku === candidateSku) return 100;
+      if (sourceSku.length >= 4 && candidateSku.length >= 4 && (sourceSku.includes(candidateSku) || candidateSku.includes(sourceSku))) {
+        marketplaceSkuScore = Math.max(marketplaceSkuScore, 90);
+      }
+    }
+  }
+
   const sourceSku = normalizeProductCode(source.sku);
   const candidateSku = normalizeProductCode(candidate.sku);
-  if (sourceSku && sourceSku === candidateSku) return 100;
 
   let skuScore = 0;
-  if (sourceSku.length >= 4 && candidateSku.length >= 4) {
-    if (sourceSku.includes(candidateSku) || candidateSku.includes(sourceSku)) skuScore = 78;
+  // El SKU interno solo es una señal de respaldo cuando falta un seller SKU de ML.
+  if ((!sourceMlSkus.length || !candidateMlSkus.length) && sourceSku.length >= 4 && candidateSku.length >= 4) {
+    if (sourceSku === candidateSku) skuScore = 88;
+    else if (sourceSku.includes(candidateSku) || candidateSku.includes(sourceSku)) skuScore = 72;
     else {
       let prefix = 0;
       while (prefix < sourceSku.length && prefix < candidateSku.length && sourceSku[prefix] === candidateSku[prefix]) prefix++;
-      skuScore = Math.round((prefix / Math.max(sourceSku.length, candidateSku.length)) * 70);
+      skuScore = Math.round((prefix / Math.max(sourceSku.length, candidateSku.length)) * 60);
     }
   }
 
@@ -45,5 +81,8 @@ export function productMatchScore(
     return sourceValue && candidateValue && sourceValue !== candidateValue;
   });
 
-  return Math.max(0, Math.max(skuScore, nameScore) - (conflictingVariant ? 25 : 0));
+  const baseScore = Math.max(marketplaceSkuScore, skuScore, nameScore);
+  // Un seller SKU de ML coincidente pesa más que atributos incompletos o inconsistentes.
+  const penalty = conflictingVariant && marketplaceSkuScore < 90 ? 25 : 0;
+  return Math.max(0, baseScore - penalty);
 }

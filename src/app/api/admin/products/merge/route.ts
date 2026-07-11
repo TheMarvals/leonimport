@@ -40,7 +40,15 @@ export async function GET(req: NextRequest) {
 
     const candidates = await prisma.product.findMany({
       where: { isActive: true, id: { not: sourceId }, NOT: { sku: { startsWith: 'ML-MISSING' } } },
-      select: { id: true, sku: true, name: true, brand: true, color: true, size: true },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        brand: true,
+        color: true,
+        size: true,
+        marketplaceListings: { select: { sellerSku: true } },
+      },
       orderBy: { updatedAt: 'desc' },
       take: 3000,
     });
