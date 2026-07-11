@@ -393,6 +393,18 @@ export default function PickingPage() {
         orderId: activeOrder.id,
         cubicleId: selectedCubicleId
       });
+
+      // Actualizar la caché de React Query optimistamente para remover las órdenes del grupo completado
+      // evitando que el useEffect de auto-resume las intente reabrir durante la carrera de estados
+      queryClient.setQueryData<Order[]>(['orders', 'picking'], (oldOrders = []) => {
+        return oldOrders.filter(o => {
+          const belongsToActiveGroup = activeOrder.shippingId
+            ? o.shippingId === activeOrder.shippingId
+            : o.id === activeOrder.id;
+          return !belongsToActiveGroup;
+        });
+      });
+
       setActiveOrder(null);
       setSelectedCubicleId('');
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -756,27 +768,31 @@ export default function PickingPage() {
       {/* Grupo Sticky Superior (Header + Banner) */}
       <div className="sticky top-0 z-40 flex flex-col shadow-2xl">
         {/* Header Picking */}
-        <div className="bg-wms-surface border-b border-wms-border p-3 md:p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="bg-leon-red text-white w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-lg md:text-xl shadow-lg shadow-leon-red/20 rotate-3 shrink-0">
+        <div className="bg-wms-surface border-b border-wms-border px-2.5 py-3 md:p-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <div className="bg-leon-red text-white w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-base md:text-xl shadow-lg shadow-leon-red/20 rotate-3 shrink-0">
               {currentItemIndex + 1}
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm md:text-xl font-black text-white leading-none truncate max-w-[140px] md:max-w-[300px]" title={`Pack: ML-${activeOrder.mlId}`}>
+              <h2 className="text-xs sm:text-sm md:text-xl font-black text-white leading-none truncate" title={`Pack: ML-${activeOrder.mlId}`}>
                 <span>ML-{activeOrder.mlId}</span>
-                {activeOrder.shippingId && <span className="block text-[9px] font-mono font-normal text-wms-muted truncate mt-0.5">{activeOrder.shippingId}</span>}
+                {activeOrder.shippingId && <span className="block text-[8px] sm:text-[9px] font-mono font-normal text-wms-muted truncate mt-0.5">{activeOrder.shippingId}</span>}
               </h2>
-              <p className="text-wms-muted text-[9px] md:text-[10px] font-bold uppercase mt-1 tracking-widest truncate">Producto {currentItemIndex + 1} de {groupedItems.length}</p>
+              <p className="text-wms-muted text-[8px] sm:text-[9px] md:text-[10px] font-bold uppercase mt-1 tracking-widest truncate">Prod. {currentItemIndex + 1} de {groupedItems.length}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             <button 
               onClick={cancelPicking}
               title="Salir y reiniciar la recolección"
-              className="text-wms-muted hover:text-leon-red text-[9px] md:text-[10px] font-black uppercase transition-colors px-3 py-2 md:px-4 md:py-2 border border-wms-border hover:border-leon-red/30 rounded-lg md:rounded-xl">
+              className="text-wms-muted hover:text-leon-red text-[9px] md:text-[10px] font-black uppercase transition-colors px-2.5 py-2 md:px-4 md:py-2 border border-wms-border hover:border-leon-red/30 rounded-lg md:rounded-xl">
               Salir
             </button>
-            {isOrderComplete && <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-amber-400 md:text-xs">Asignar cubículo</span>}
+            {isOrderComplete && (
+              <span className="hidden sm:inline-flex rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[9px] md:text-xs font-black uppercase tracking-wider text-amber-400">
+                Asignar cubículo
+              </span>
+            )}
           </div>
         </div>
 
