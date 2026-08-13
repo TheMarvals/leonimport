@@ -39,7 +39,7 @@ export default async function HomePage() {
       title: 'INVENTARIO',
       desc: 'Productos, stock y ubicaciones',
       color: 'amber-500',
-      roles: ['SUPERVISOR', 'ADMIN'],
+      roles: ['SUPERVISOR', 'ADMIN', 'BODEGUERO'],
     },
     {
       href: '/supervisor',

@@ -11,7 +11,7 @@ export default function Providers({ children }: { children: ReactNode }) {
           queries: {
             staleTime: 30 * 1000, // 30s antes de considerar datos obsoletos
             gcTime: 5 * 60 * 1000, // 5min en caché
-            refetchOnWindowFocus: false, // No recargar al cambiar de pestaña
+            refetchOnWindowFocus: true, // Mostrar cambios recientes al volver a la aplicación
             retry: 1, // Solo 1 reintento
           },
         },

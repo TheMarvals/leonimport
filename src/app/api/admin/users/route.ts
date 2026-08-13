@@ -10,7 +10,9 @@ export async function GET() {
   }
 
   const users = await prisma.user.findMany({
-    where: { role: { in: ['SUPERVISOR', 'PICKER', 'PACKER'] } },
+    // El cast mantiene compatibilidad durante el despliegue mientras Prisma
+    // regenera el cliente con el nuevo valor del enum.
+    where: { role: { in: ['SUPERVISOR', 'BODEGUERO', 'PICKER', 'PACKER'] as any } },
     select: { id: true, name: true, role: true, isActive: true, createdAt: true },
     orderBy: { createdAt: 'desc' }
   });
@@ -26,7 +28,7 @@ export async function POST(req: Request) {
   try {
     const { name, pin, role } = await req.json();
     
-    if (!name?.trim() || !/^\d{4,6}$/.test(pin) || !['SUPERVISOR', 'PICKER', 'PACKER'].includes(role)) {
+    if (!name?.trim() || !/^\d{4,6}$/.test(pin) || !['SUPERVISOR', 'BODEGUERO', 'PICKER', 'PACKER'].includes(role)) {
       return NextResponse.json({ error: 'Nombre, rol y PIN de 4 a 6 números son requeridos' }, { status: 400 });
     }
 
@@ -55,7 +57,7 @@ export async function PUT(req: Request) {
 
   try {
     const { id, name, pin, role, isActive } = await req.json();
-    if (!id || !name?.trim() || !['SUPERVISOR', 'PICKER', 'PACKER'].includes(role)) {
+    if (!id || !name?.trim() || !['SUPERVISOR', 'BODEGUERO', 'PICKER', 'PACKER'].includes(role)) {
       return NextResponse.json({ error: 'Usuario, nombre y rol válidos son requeridos' }, { status: 400 });
     }
     if (pin && !/^\d{4,6}$/.test(pin)) {

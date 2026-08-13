@@ -250,6 +250,30 @@ export default function PickingPage() {
     },
   });
 
+  // Mantener la cola conectada con Mercado Libre sin depender del botón manual.
+  // El lock del backend evita que dos estaciones ejecuten el sync en paralelo.
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncSilently = async () => {
+      try {
+        const response = await fetch('/api/sync/ml', { method: 'POST' });
+        if (response.ok && !cancelled) {
+          queryClient.invalidateQueries({ queryKey: ['orders'] });
+        }
+      } catch {
+        // El polling de la base local sigue funcionando aunque ML esté temporalmente caído.
+      }
+    };
+
+    syncSilently();
+    const interval = window.setInterval(syncSilently, 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [queryClient]);
+
   // Mutación: refrescar orden individual
   const refreshMutation = useMutation({
     mutationFn: (orderId: string) =>

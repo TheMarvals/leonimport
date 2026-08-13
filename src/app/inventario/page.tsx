@@ -3,7 +3,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Plus, Package, MapPin, ArrowLeft, Search, Truck, Printer, Check, ChevronDown, X, Star, History as HistoryIcon, Trash2 } from 'lucide-react';
+import { Plus, Package, MapPin, ArrowLeft, Search, Truck, Printer, Check, ChevronDown, X, Star, History as HistoryIcon, Trash2, Pencil, Save } from 'lucide-react';
 import Image from 'next/image';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
@@ -14,6 +14,7 @@ interface Supplier {
   name: string;
   contact: string | null;
   country: string | null;
+  notes: string | null;
   _count: { products: number };
 }
 
@@ -90,6 +91,19 @@ export default function InventarioPage() {
   const [supForm, setSupForm] = useState({ name: '', contact: '', country: '', notes: '' });
   const [printingProduct, setPrintingProduct] = useState<Product | null>(null);
   const [printQty, setPrintQty] = useState('1');
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [supplierEditForm, setSupplierEditForm] = useState({ name: '', contact: '', country: '', notes: '' });
+
+  const { data: currentUser } = useQuery<{ role: string }>({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth/me');
+      if (!response.ok) throw new Error('No se pudo cargar la sesión');
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const canManageInventory = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERVISOR';
 
   // React Query: fetching de productos, ubicaciones y proveedores con caché
   const { data: products = [] as Product[] } = useQuery<Product[]>({
@@ -326,6 +340,37 @@ export default function InventarioPage() {
     setPrintQty('1');
   };
 
+  const openSupplierEditor = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+    setSupplierEditForm({
+      name: supplier.name,
+      contact: supplier.contact || '',
+      country: supplier.country || '',
+      notes: supplier.notes || '',
+    });
+  };
+
+  const updateSupplier = async () => {
+    if (!editingSupplier || !supplierEditForm.name.trim()) return;
+    setLoading(true);
+    try {
+      const response = await fetch('/api/suppliers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingSupplier.id, ...supplierEditForm }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo actualizar el proveedor');
+      setEditingSupplier(null);
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      showToast('Proveedor actualizado.', 'success');
+    } catch (error: any) {
+      await showModalAlert('Error', error.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatPrice = (val: number | null, currency: string) => {
     if (val === null) return '—';
     return new Intl.NumberFormat('es-CL', { style: 'currency', currency }).format(val);
@@ -345,11 +390,12 @@ export default function InventarioPage() {
     (!categoryFilter || p.categoryFamily === parseInt(categoryFilter))
   );
 
-  const tabs: { key: Tab; icon: typeof Package; label: string; count: number }[] = [
+  const allTabs: { key: Tab; icon: typeof Package; label: string; count: number }[] = [
     { key: 'products', icon: Package, label: 'Productos', count: products.length },
     { key: 'locations', icon: MapPin, label: 'Ubicaciones', count: locations.length },
     { key: 'suppliers', icon: Truck, label: 'Proveedores', count: suppliers.length },
   ];
+  const tabs = allTabs.filter(item => canManageInventory || item.key === 'products');
 
   return (
     <div className="min-h-screen bg-wms-bg text-wms-text font-sans" data-scanner-ignore>
@@ -382,10 +428,10 @@ export default function InventarioPage() {
                 </button>
               </div>
             )}
-            <button onClick={() => { setShowForm(!showForm); setSkuGenerated(false); setProdForm({ sku: '', name: '', brand: '', color: '', size: '', imageUrl: '', costPrice: '', salePrice: '', currency: 'CLP', supplierId: '' }); }}
+            {canManageInventory && <button onClick={() => { setShowForm(!showForm); setSkuGenerated(false); setProdForm({ sku: '', name: '', brand: '', color: '', size: '', imageUrl: '', costPrice: '', salePrice: '', currency: 'CLP', supplierId: '' }); }}
               className="w-full md:w-auto justify-center bg-leon-red hover:bg-leon-red-light text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors">
               <Plus size={18} /> NUEVO
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -527,7 +573,7 @@ export default function InventarioPage() {
               <option value="17000">Papelería y Oficina</option>
             </select>
             
-            {selected.size > 0 && (
+            {canManageInventory && selected.size > 0 && (
               <div className="flex w-full gap-2 md:w-auto">
                 <button 
                   onClick={deleteSelectedProducts}
@@ -601,9 +647,9 @@ export default function InventarioPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-wms-border/60 bg-wms-bg/50 p-3 text-center">
-                      <div><p className="text-[9px] uppercase text-wms-muted">Costo</p><p className="mt-1 truncate text-xs font-bold">{defaultCost ? formatPrice(defaultCost.cost, defaultCost.currency) : '—'}</p></div>
-                      <div><p className="text-[9px] uppercase text-wms-muted">Venta</p><p className="mt-1 truncate text-xs font-bold">{formatPrice(p.salePrice, p.currency)}</p></div>
+                    <div className={`mt-4 grid gap-2 rounded-xl border border-wms-border/60 bg-wms-bg/50 p-3 text-center ${canManageInventory ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                      {canManageInventory && <div><p className="text-[9px] uppercase text-wms-muted">Costo</p><p className="mt-1 truncate text-xs font-bold">{defaultCost ? formatPrice(defaultCost.cost, defaultCost.currency) : '—'}</p></div>}
+                      {canManageInventory && <div><p className="text-[9px] uppercase text-wms-muted">Venta</p><p className="mt-1 truncate text-xs font-bold">{formatPrice(p.salePrice, p.currency)}</p></div>}
                       <div><p className="text-[9px] uppercase text-wms-muted">Stock</p><p className={`mt-1 text-xs font-black ${totalStock > 0 ? 'text-emerald-400' : 'text-wms-muted'}`}>{totalStock} un.</p></div>
                     </div>
 
@@ -634,10 +680,10 @@ export default function InventarioPage() {
                     <th className="px-3 py-3 text-left text-xs font-bold text-wms-muted uppercase">SKU</th>
                     <th className="px-3 py-3 text-left text-xs font-bold text-wms-muted uppercase">Nombre</th>
                     <th className="px-3 py-3 text-left text-xs font-bold text-wms-muted uppercase">Categoría</th>
-                    <th className="px-3 py-3 text-left text-xs font-bold text-wms-muted uppercase">Proveedores</th>
-                    <th className="px-3 py-3 text-right text-xs font-bold text-wms-muted uppercase">Costo</th>
-                    <th className="px-3 py-3 text-right text-xs font-bold text-wms-muted uppercase">Venta</th>
-                    <th className="px-3 py-3 text-right text-xs font-bold text-wms-muted uppercase">Margen</th>
+                    {canManageInventory && <th className="px-3 py-3 text-left text-xs font-bold text-wms-muted uppercase">Proveedores</th>}
+                    {canManageInventory && <th className="px-3 py-3 text-right text-xs font-bold text-wms-muted uppercase">Costo</th>}
+                    {canManageInventory && <th className="px-3 py-3 text-right text-xs font-bold text-wms-muted uppercase">Venta</th>}
+                    {canManageInventory && <th className="px-3 py-3 text-right text-xs font-bold text-wms-muted uppercase">Margen</th>}
                     <th className="px-3 py-3 text-left text-xs font-bold text-wms-muted uppercase">Ubicación</th>
                     <th className="px-3 py-3 text-right text-xs font-bold text-wms-muted uppercase">Stock</th>
                   </tr>
@@ -649,8 +695,8 @@ export default function InventarioPage() {
                     const isSelected = selected.has(p.id);
                     return (
                       <Fragment key={p.id}>
-                      <tr onClick={() => toggleExpand(p.id)}
-                        className={`border-b border-wms-border/50 cursor-pointer transition-colors duration-150 ${
+                      <tr onClick={() => canManageInventory && toggleExpand(p.id)}
+                        className={`border-b border-wms-border/50 transition-colors duration-150 ${canManageInventory ? 'cursor-pointer' : ''} ${
                           isSelected 
                             ? 'bg-leon-red/10' 
                             : expandedProduct === p.id 
@@ -722,7 +768,7 @@ export default function InventarioPage() {
                             <span className="text-wms-muted/40 font-mono italic text-xs">Sin categoría</span>
                           )}
                         </td>
-                        <td className="px-3 py-4 text-sm">
+                        {canManageInventory && <td className="px-3 py-4 text-sm">
                           {p.suppliers.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {p.suppliers.map(s => (
@@ -738,18 +784,18 @@ export default function InventarioPage() {
                           ) : (
                             <span className="text-wms-muted/40 font-mono italic text-xs">Sin proveedor</span>
                           )}
-                        </td>
-                        <td className="px-3 py-4 text-right text-sm font-mono font-semibold text-white/80">
+                        </td>}
+                        {canManageInventory && <td className="px-3 py-4 text-right text-sm font-mono font-semibold text-white/80">
                           {defaultCost ? (
                             formatPrice(defaultCost.cost, defaultCost.currency)
                           ) : (
                             <span className="text-wms-muted/40 font-mono italic text-xs">Sin costo</span>
                           )}
-                        </td>
-                        <td className="px-3 py-4 text-right text-sm font-mono font-bold text-white">
+                        </td>}
+                        {canManageInventory && <td className="px-3 py-4 text-right text-sm font-mono font-bold text-white">
                           {formatPrice(p.salePrice, p.currency)}
-                        </td>
-                        <td className="px-3 py-4 text-right text-sm font-mono font-black">
+                        </td>}
+                        {canManageInventory && <td className="px-3 py-4 text-right text-sm font-mono font-black">
                           {margin !== null ? (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs border ${
                               margin >= 30 ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' :
@@ -759,7 +805,7 @@ export default function InventarioPage() {
                           ) : (
                             <span className="text-wms-muted/30 font-mono text-xs">—</span>
                           )}
-                        </td>
+                        </td>}
                         <td className="px-3 py-4 text-sm">
                           {p.locations.length > 0 ? (
                             <div className="flex flex-wrap gap-1 max-w-[180px]">
@@ -786,14 +832,14 @@ export default function InventarioPage() {
                                 }`}>
                                   {totalStock} un.
                                 </span>
-                                <ChevronDown size={14} className={`text-wms-muted transition-transform duration-200 shrink-0 ${expandedProduct === p.id ? 'rotate-180 text-white' : ''}`} />
+                                {canManageInventory && <ChevronDown size={14} className={`text-wms-muted transition-transform duration-200 shrink-0 ${expandedProduct === p.id ? 'rotate-180 text-white' : ''}`} />}
                               </div>
                             );
                           })()}
                         </td>
                       </tr>
                       {/* Panel de proveedores y ubicaciones expandible */}
-                      {expandedProduct === p.id && (
+                      {canManageInventory && expandedProduct === p.id && (
                         <tr><td colSpan={10} className="px-6 py-6 bg-wms-card/20 border-t border-b border-wms-border/30">
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             
@@ -985,7 +1031,10 @@ export default function InventarioPage() {
                       <h3 className="truncate font-bold text-white">{supplier.name}</h3>
                       <p className="mt-1 break-words text-xs text-wms-muted">{supplier.contact || 'Sin contacto'}</p>
                     </div>
-                    <span className="shrink-0 rounded-lg bg-leon-red/10 px-2.5 py-1 text-xs font-black text-leon-red-light">{supplier._count.products} prod.</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="rounded-lg bg-leon-red/10 px-2.5 py-1 text-xs font-black text-leon-red-light">{supplier._count.products} prod.</span>
+                      <button onClick={() => openSupplierEditor(supplier)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-wms-border text-wms-muted hover:border-amber-500 hover:text-amber-400" aria-label={`Editar ${supplier.name}`}><Pencil size={15} /></button>
+                    </div>
                   </div>
                   <p className="text-xs"><span className="text-wms-muted">País:</span> {supplier.country || '—'}</p>
                 </article>
@@ -997,6 +1046,7 @@ export default function InventarioPage() {
                 <th className="px-6 py-4 text-left text-xs font-bold text-wms-muted uppercase">Contacto</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-wms-muted uppercase">País</th>
                 <th className="px-6 py-4 text-right text-xs font-bold text-wms-muted uppercase">Productos</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-wms-muted uppercase">Acciones</th>
               </tr></thead>
               <tbody>
                 {suppliers.length > 0 ? suppliers.map(s => (
@@ -1005,15 +1055,37 @@ export default function InventarioPage() {
                     <td className="px-6 py-4 text-sm text-wms-muted">{s.contact || '—'}</td>
                     <td className="px-6 py-4 text-sm">{s.country || '—'}</td>
                     <td className="px-6 py-4 text-right font-bold text-leon-red">{s._count.products}</td>
+                    <td className="px-6 py-4 text-right"><button onClick={() => openSupplierEditor(s)} className="inline-flex items-center gap-2 rounded-lg border border-wms-border px-3 py-2 text-xs font-bold text-white hover:border-amber-500 hover:text-amber-400"><Pencil size={14} /> EDITAR</button></td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={4} className="px-6 py-12 text-center text-wms-muted">Sin proveedores</td></tr>
+                  <tr><td colSpan={5} className="px-6 py-12 text-center text-wms-muted">Sin proveedores</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {editingSupplier && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="my-3 w-full max-w-lg overflow-hidden rounded-2xl border border-wms-border bg-wms-surface shadow-2xl">
+            <div className="flex items-center justify-between bg-leon-red p-5 text-white">
+              <h3 className="text-lg font-black uppercase">Editar proveedor</h3>
+              <button onClick={() => setEditingSupplier(null)} className="rounded-lg p-1 hover:bg-black/20"><X size={20} /></button>
+            </div>
+            <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+              <input autoFocus placeholder="Nombre *" value={supplierEditForm.name} onChange={e => setSupplierEditForm({ ...supplierEditForm, name: e.target.value })} className="rounded-xl border border-wms-border bg-wms-bg px-4 py-3 text-white outline-none focus:border-leon-red sm:col-span-2" />
+              <input placeholder="Contacto (tel/email)" value={supplierEditForm.contact} onChange={e => setSupplierEditForm({ ...supplierEditForm, contact: e.target.value })} className="rounded-xl border border-wms-border bg-wms-bg px-4 py-3 text-white outline-none focus:border-leon-red" />
+              <input placeholder="País de origen" value={supplierEditForm.country} onChange={e => setSupplierEditForm({ ...supplierEditForm, country: e.target.value })} className="rounded-xl border border-wms-border bg-wms-bg px-4 py-3 text-white outline-none focus:border-leon-red" />
+              <textarea placeholder="Notas" value={supplierEditForm.notes} onChange={e => setSupplierEditForm({ ...supplierEditForm, notes: e.target.value })} className="min-h-24 rounded-xl border border-wms-border bg-wms-bg px-4 py-3 text-white outline-none focus:border-leon-red sm:col-span-2" />
+              <div className="flex gap-3 sm:col-span-2">
+                <button onClick={() => setEditingSupplier(null)} className="flex-1 rounded-xl border border-wms-border py-3 font-bold text-wms-muted">CANCELAR</button>
+                <button onClick={updateSupplier} disabled={loading || !supplierEditForm.name.trim()} className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-leon-red py-3 font-black text-white disabled:opacity-40"><Save size={17} /> {loading ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── MODAL DE IMPRESIÓN ─── */}
       {printingProduct && (

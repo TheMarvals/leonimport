@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
 
   const products = await prisma.product.findMany({
     where: { id: { in: ids } },
-    include: { suppliers: { include: { supplier: true } } },
   });
 
   // Expandir productos según counts
@@ -79,10 +78,6 @@ export async function GET(req: NextRequest) {
       white-space: nowrap;
       margin-bottom: 0.5mm;
     }
-    .label-price {
-      font-size: calc(${fontSize} + 2px);
-      font-weight: 900;
-    }
     .barcode-container { 
       text-align: center; 
       display: flex; 
@@ -115,7 +110,6 @@ export async function GET(req: NextRequest) {
       <div class="label">
         <div class="label-header">
           <span class="label-brand">LEÓN IMPORT</span>
-          ${p.salePrice ? `<span class="label-price">$${new Intl.NumberFormat('es-CL').format(p.salePrice)}</span>` : ''}
         </div>
         <div class="label-name">${p.name}</div>
         <div class="barcode-container">

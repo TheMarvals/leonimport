@@ -1041,6 +1041,7 @@ export default function AdminPage() {
                     className="w-full bg-wms-bg border border-wms-border p-4 rounded-xl text-white outline-none focus:border-leon-red">
                     <option value="PICKER">PICKER</option>
                     <option value="PACKER">PACKER</option>
+                    <option value="BODEGUERO">BODEGUERO</option>
                     <option value="SUPERVISOR">SUPERVISOR</option>
                     <option value="ADMIN">ADMINISTRADOR</option>
                   </select>

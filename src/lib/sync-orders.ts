@@ -699,7 +699,7 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
     const activeOrders = await prisma.order.findMany({
       where: { status: { in: ['PENDING', 'PICKING', 'PACKING', 'RESOLUTION_REQUIRED'] } },
       orderBy: { updatedAt: 'asc' }, // Más antiguas primero
-      take: 15, // Lote pequeño para no ahogar la API de ML
+      take: 30, // Reconciliar gradualmente también órdenes antiguas que quedaron abiertas
       select: {
         id: true,
         status: true,

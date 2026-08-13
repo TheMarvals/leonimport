@@ -37,6 +37,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/', req.url));
   }
 
+  if (pathname.startsWith('/inventario') && !['BODEGUERO', 'SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+
   return res;
 }
 

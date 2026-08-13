@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 export interface SessionData {
   userId: string;
   name: string;
-  role: 'ADMIN' | 'SUPERVISOR' | 'PICKER' | 'PACKER';
+  role: 'ADMIN' | 'SUPERVISOR' | 'BODEGUERO' | 'PICKER' | 'PACKER';
   isLoggedIn: boolean;
   station?: string;
 }

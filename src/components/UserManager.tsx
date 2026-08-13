@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { KeyRound, Pencil, Power, Save, Shield, Trash2, UserPlus, X } from 'lucide-react';
 import { showConfirmModal, showToast } from '@/lib/toast';
 
-type UserRole = 'SUPERVISOR' | 'PICKER' | 'PACKER';
+type UserRole = 'SUPERVISOR' | 'BODEGUERO' | 'PICKER' | 'PACKER';
 
 type ManagedUser = {
   id: string;
@@ -26,6 +26,7 @@ const emptyUser: UserForm = { name: '', pin: '', role: 'PICKER', isActive: true 
 
 const roleStyles: Record<UserRole, string> = {
   SUPERVISOR: 'border-purple-500/30 bg-purple-500/10 text-purple-300',
+  BODEGUERO: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
   PICKER: 'border-blue-500/30 bg-blue-500/10 text-blue-300',
   PACKER: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
 };
@@ -169,6 +170,7 @@ export default function UserManager() {
                 <select value={form.role} onChange={event => setForm({ ...form, role: event.target.value as UserRole })} className="min-h-12 w-full rounded-xl border border-wms-border bg-wms-bg px-4 text-white outline-none focus:border-leon-red">
                   <option value="PICKER">PICKER</option>
                   <option value="PACKER">PACKER</option>
+                  <option value="BODEGUERO">BODEGUERO</option>
                   <option value="SUPERVISOR">SUPERVISOR</option>
                 </select>
               </label>
