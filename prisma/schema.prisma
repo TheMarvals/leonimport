@@ -18,6 +18,23 @@ model User {
   createdAt DateTime @default(now())
 }
 
+/// Cuenta de Mercado Libre ya autorizada en el gateway compartido.
+/// El WMS solo conserva la referencia; los tokens siguen viviendo en el gateway.
+model MercadoLibreAccount {
+  id               String   @id @default(uuid())
+  gatewayAccountId String   @unique
+  sellerId         String
+  nickname         String
+  siteId           String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  orders            Order[]
+
+  @@index([isActive])
+  @@index([sellerId])
+}
+
 model Supplier {
   id        String            @id @default(uuid())
   name      String
@@ -140,12 +157,15 @@ model Order {
   pickingMethod  String?
   packingMethod  String?
   cubicleId      String?
+  mlAccountId    String?
   cubicleNumber  Int?
   cubicle        Cubicle?   @relation(fields: [cubicleId], references: [id], onDelete: SetNull)
+  mlAccount      MercadoLibreAccount? @relation(fields: [mlAccountId], references: [id], onDelete: SetNull)
   auditLogs      AuditLog[]
   items          OrderItem[]
 
   @@index([cubicleId])
+  @@index([mlAccountId])
 }
 
 model OrderItem {

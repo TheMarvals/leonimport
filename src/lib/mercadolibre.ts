@@ -1,5 +1,6 @@
 import { getHighResImageUrl } from './image-utils';
 import RedisManager from './redis';
+import type { MlAccountConfig } from './ml-accounts';
 
 /**
  * Cliente directo a la API de MercadoLibre.
@@ -20,29 +21,30 @@ const ML_API_BASE = 'https://api.mercadolibre.com';
 // Configuración desde .env
 const GATEWAY_URL = () => process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com';
 const GATEWAY_API_KEY = () => process.env.ML_GATEWAY_API_KEY || '';
-const ML_ACCOUNT_ID = () => process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70';
-const ML_SELLER_ID = () => process.env.ML_SELLER_ID || '1513023287';
+const LEGACY_ACCOUNT_ID = () => process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70';
+const LEGACY_SELLER_ID = () => process.env.ML_SELLER_ID || '1513023287';
 
 type TokenCache = {
   access_token: string;
   expires_at: number; // timestamp ms
 };
 
-let tokenCache: TokenCache | null = null;
+const tokenCache = new Map<string, TokenCache>();
 
 /**
  * Obtiene un access_token válido desde el gateway.
  * Hace cache del token y lo refresca solo cuando expira.
  */
-async function getAccessToken(): Promise<string> {
+async function getAccessToken(gatewayAccountId: string): Promise<string> {
   const now = Date.now();
+  const cached = tokenCache.get(gatewayAccountId);
 
   // Usar cache si el token aún es válido (con 5 min de margen)
-  if (tokenCache && tokenCache.expires_at > now + 5 * 60 * 1000) {
-    return tokenCache.access_token;
+  if (cached && cached.expires_at > now + 5 * 60 * 1000) {
+    return cached.access_token;
   }
 
-  const url = `${GATEWAY_URL()}/api/accounts/${ML_ACCOUNT_ID()}/token`;
+  const url = `${GATEWAY_URL()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`;
   const res = await fetch(url, {
     headers: { 'x-api-key': GATEWAY_API_KEY() },
     signal: AbortSignal.timeout(10000),
@@ -56,10 +58,10 @@ async function getAccessToken(): Promise<string> {
   const data = await res.json();
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : now + 6 * 60 * 60 * 1000;
 
-  tokenCache = {
+  tokenCache.set(gatewayAccountId, {
     access_token: data.access_token,
     expires_at: expiresAt,
-  };
+  });
 
   return data.access_token;
 }
@@ -67,8 +69,8 @@ async function getAccessToken(): Promise<string> {
 /**
  * Headers de autenticación para llamar a la API de ML.
  */
-async function mlHeaders(): Promise<Record<string, string>> {
-  const token = await getAccessToken();
+async function mlHeaders(gatewayAccountId: string): Promise<Record<string, string>> {
+  const token = await getAccessToken(gatewayAccountId);
   return {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
@@ -350,6 +352,7 @@ async function runWithConcurrency<T>(
  * Coincide con el formato que antes devolvía el gateway.
  */
 export type MlShipmentOrder = {
+  accountId: string;
   ml_shipment_id: string;
   ml_shipment_external_id: number;
   ml_shipping_id: string | null;
@@ -374,9 +377,14 @@ export type MlShipmentOrder = {
  * @param limit Máximo de órdenes a obtener (default 50)
  * @returns Array de órdenes en formato unificado para syncOrders
  */
-export async function fetchPendingOrders(limit: number = 50, offset: number = 0): Promise<MlShipmentOrder[]> {
-  const headers = await mlHeaders();
-  const sellerId = ML_SELLER_ID();
+export async function fetchPendingOrders(
+  limit: number = 50,
+  offset: number = 0,
+  account?: Pick<MlAccountConfig, 'gatewayAccountId' | 'sellerId'>,
+): Promise<MlShipmentOrder[]> {
+  const gatewayAccountId = account?.gatewayAccountId || LEGACY_ACCOUNT_ID();
+  const headers = await mlHeaders(gatewayAccountId);
+  const sellerId = account?.sellerId || LEGACY_SELLER_ID();
 
   // El cache de imágenes ahora usa Redis con TTL de 1h (las imágenes pueden cambiar).
   // El cache de categorías ML no necesita TTL porque ML no cambia sus categorías.
@@ -492,6 +500,7 @@ export async function fetchPendingOrders(limit: number = 50, offset: number = 0)
       : null;
 
     results.push({
+      accountId: gatewayAccountId,
       ml_shipment_id: `ml-order-${order.id}`,
       ml_shipment_external_id: shipment?.id ? Number(shipment.id) : order.id, // Shipping ID como clave del paquete físico
       ml_shipping_id: shipment?.id ? String(shipment.id) : null,
@@ -545,8 +554,11 @@ export async function fetchPendingOrders(limit: number = 50, offset: number = 0)
  * @param mlOrderId ID numérico de la orden en ML (ej. 123456789)
  * @returns Los datos de la orden en formato MlShipmentOrder, o null si no se encuentra
  */
-export async function fetchSingleOrder(mlOrderId: number | bigint): Promise<MlShipmentOrder | null> {
-  const headers = await mlHeaders();
+export async function fetchSingleOrder(
+  mlOrderId: number | bigint,
+  gatewayAccountId: string = LEGACY_ACCOUNT_ID(),
+): Promise<MlShipmentOrder | null> {
+  const headers = await mlHeaders(gatewayAccountId);
 
   // Obtener detalle completo de la orden
   const orderDetailRes = await fetch(`${ML_API_BASE}/orders/${mlOrderId}`, {
@@ -628,6 +640,7 @@ export async function fetchSingleOrder(mlOrderId: number | bigint): Promise<MlSh
     : null;
 
   return {
+    accountId: gatewayAccountId,
     ml_shipment_id: `ml-order-${orderDetail.id}`,
     ml_shipment_external_id: orderDetail.id, // Siempre usar order ID (único) — el shipping ID puede ser compartido
     ml_shipping_id: shipment?.id ? String(shipment.id) : null,
@@ -651,5 +664,5 @@ export async function fetchSingleOrder(mlOrderId: number | bigint): Promise<MlSh
  * Limpia el cache de token (forzar refresco en la próxima llamada).
  */
 export function clearTokenCache(): void {
-  tokenCache = null;
+  tokenCache.clear();
 }

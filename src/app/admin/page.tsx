@@ -4,13 +4,22 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Users, UserPlus, Shield, Key, Power, ArrowLeft, Save, Activity,
-  AlertCircle, Package, Search, Check, Grid3X3, Plus, Pencil, Trash2, X, GitMerge
+  AlertCircle, Package, Search, Check, Grid3X3, Plus, Pencil, Trash2, X, GitMerge,
+  Link2, Unlink, Store
 } from 'lucide-react';
 import Link from 'next/link';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
 import ProductMergeManager from '@/components/ProductMergeManager';
 
-type Tab = 'users' | 'cubicles' | 'duplicates' | 'ml-missing';
+type Tab = 'users' | 'ml-accounts' | 'cubicles' | 'duplicates' | 'ml-missing';
+
+type MlAccount = {
+  id: string;
+  gatewayAccountId: string;
+  sellerId: string;
+  nickname: string;
+  siteId: string | null;
+};
 
 type Cubicle = {
   id: string;
@@ -41,6 +50,12 @@ export default function AdminPage() {
 
   // ─── ML-MISSING state ───
   const [searchTerm, setSearchTerm] = useState('');
+
+  // ─── Mercado Libre accounts state ───
+  const [gatewayAccountId, setGatewayAccountId] = useState('');
+  const [linkingAccount, setLinkingAccount] = useState(false);
+  const [mlAuthorization, setMlAuthorization] = useState<{ clientId: string; url: string; expiresAt: string } | null>(null);
+  const [gatewayAccounts, setGatewayAccounts] = useState<Omit<MlAccount, 'id'>[]>([]);
 
   // ─── Cubicle state ───
   const [newCubicleNumber, setNewCubicleNumber] = useState('');
@@ -73,6 +88,18 @@ export default function AdminPage() {
     enabled: tab === 'cubicles',
   });
 
+  const { data: mlAccounts = [], isLoading: mlAccountsLoading } = useQuery<MlAccount[]>({
+    queryKey: ['admin', 'ml-accounts'],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/ml-accounts');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No se pudieron cargar las cuentas de Mercado Libre');
+      return data;
+    },
+    staleTime: 30 * 1000,
+    enabled: tab === 'ml-accounts',
+  });
+
   const ghostGroups: GhostGroup[] = ghostData?.items ?? [];
 
   // ─── Resolution modal state ───
@@ -99,12 +126,128 @@ export default function AdminPage() {
     queryClient.invalidateQueries({ queryKey: ['cubicles'] });
   }, [queryClient]);
 
+  const fetchMlAccounts = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['admin', 'ml-accounts'] });
+  }, [queryClient]);
+
   // ─── Effects ───
   useEffect(() => {
     if (tab === 'users') fetchUsers();
     if (tab === 'ml-missing') fetchGhosts();
     if (tab === 'cubicles') fetchCubicles();
-  }, [tab, fetchUsers, fetchGhosts, fetchCubicles]);
+    if (tab === 'ml-accounts') fetchMlAccounts();
+  }, [tab, fetchUsers, fetchGhosts, fetchCubicles, fetchMlAccounts]);
+
+  const linkGatewayAccount = async (accountId: string) => {
+    if (!accountId.trim() || linkingAccount) return;
+    setLinkingAccount(true);
+    try {
+      const response = await fetch('/api/admin/ml-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gatewayAccountId: accountId.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo vincular la cuenta');
+      setGatewayAccountId('');
+      setGatewayAccounts(current => current.filter(account => account.gatewayAccountId !== accountId));
+      fetchMlAccounts();
+      showToast(`Cuenta ${data.nickname} vinculada.`, 'success');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setLinkingAccount(false);
+    }
+  };
+
+  const linkMlAccount = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await linkGatewayAccount(gatewayAccountId);
+  };
+
+  const loadGatewayAccounts = async () => {
+    if (linkingAccount) return;
+    setLinkingAccount(true);
+    try {
+      const response = await fetch('/api/admin/ml-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_gateway_accounts' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudieron consultar las cuentas');
+      const linkedIds = new Set(mlAccounts.map(account => account.gatewayAccountId));
+      setGatewayAccounts((data.accounts || []).filter((account: any) => !linkedIds.has(account.gatewayAccountId)));
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setLinkingAccount(false);
+    }
+  };
+
+  const generateMlAuthorization = async () => {
+    if (linkingAccount) return;
+    setLinkingAccount(true);
+    try {
+      const response = await fetch('/api/admin/ml-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate_link' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo generar el enlace');
+      setMlAuthorization(data);
+      showToast('Enlace generado. Ábrelo para autorizar la cuenta.', 'success');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setLinkingAccount(false);
+    }
+  };
+
+  const completeMlAuthorization = async () => {
+    if (!mlAuthorization || linkingAccount) return;
+    setLinkingAccount(true);
+    try {
+      const response = await fetch('/api/admin/ml-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete_link', clientId: mlAuthorization.clientId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'La autorización aún no está completa');
+      setMlAuthorization(null);
+      fetchMlAccounts();
+      showToast(`Cuenta ${data.nickname} vinculada al WMS.`, 'success');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setLinkingAccount(false);
+    }
+  };
+
+  const unlinkMlAccount = async (account: MlAccount) => {
+    const confirmation = await showConfirmModal(
+      `¿Quitar la cuenta ${account.nickname}?`,
+      'Dejará de importar órdenes nuevas. Las órdenes y publicaciones ya guardadas se conservarán.',
+      'Sí, quitar cuenta',
+    );
+    if (!confirmation.isConfirmed) return;
+
+    try {
+      const response = await fetch('/api/admin/ml-accounts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: account.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo quitar la cuenta');
+      fetchMlAccounts();
+      showToast('Cuenta de Mercado Libre quitada.', 'info');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    }
+  };
 
   const saveCubicle = async (method: 'POST' | 'PUT') => {
     const payload = method === 'POST'
@@ -457,6 +600,12 @@ export default function AdminPage() {
           }`}>
           <AlertCircle size={16} className="md:w-[18px] md:h-[18px]" /> ML-MISSING ({ghostGroups.length})
         </button>
+        <button onClick={() => setTab('ml-accounts')}
+          className={`justify-center shrink-0 px-3 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
+            tab === 'ml-accounts' ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
+          }`}>
+          <Link2 size={16} className="md:w-[18px] md:h-[18px]" /> CUENTAS ML ({mlAccounts.length})
+        </button>
         <button onClick={() => setTab('cubicles')}
           className={`justify-center shrink-0 px-3 md:px-6 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 transition-all ${
             tab === 'cubicles' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-wms-surface text-wms-muted border border-wms-border hover:border-wms-muted/30'
@@ -518,6 +667,158 @@ export default function AdminPage() {
             ))}
           </div>
         </>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* TAB: CUENTAS MERCADO LIBRE */}
+      {/* ═══════════════════════════════════════════ */}
+      {tab === 'ml-accounts' && (
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-lg font-black uppercase tracking-wider md:text-xl">Cuentas vinculadas de Mercado Libre</h2>
+            <p className="mt-1 max-w-3xl text-sm text-wms-muted">
+              Autoriza la cuenta con el flujo OAuth que ya ofrece el gateway. El WMS solo guarda la referencia local y nunca almacena tokens ni credenciales de Mercado Libre.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-sky-500/20 bg-wms-surface p-4 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-black uppercase tracking-wider text-white">Vincular una cuenta nueva</p>
+                <p className="mt-1 text-xs text-wms-muted">El enlace expira automáticamente y la autorización ocurre en Mercado Libre.</p>
+                <p className="mt-2 text-xs text-amber-400">Si la cuenta ya está conectada a Leon Express, usa su ID existente en la opción inferior para conservar esa asociación.</p>
+              </div>
+              {!mlAuthorization ? (
+                <button
+                  type="button"
+                  onClick={generateMlAuthorization}
+                  disabled={linkingAccount}
+                  className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-sky-600 px-6 text-xs font-black uppercase tracking-wider text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                >
+                  <Link2 size={17} /> {linkingAccount ? 'Generando…' : 'Generar enlace'}
+                </button>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <a
+                    href={mlAuthorization.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 text-xs font-black uppercase tracking-wider text-black hover:bg-yellow-300"
+                  >
+                    <Store size={17} /> Abrir autorización
+                  </a>
+                  <button
+                    type="button"
+                    onClick={completeMlAuthorization}
+                    disabled={linkingAccount}
+                    className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-5 text-xs font-black uppercase tracking-wider text-green-400 disabled:opacity-50"
+                  >
+                    <Check size={17} /> {linkingAccount ? 'Comprobando…' : 'Ya autoricé'}
+                  </button>
+                </div>
+              )}
+            </div>
+            {mlAuthorization && (
+              <p className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-3 text-xs text-yellow-200">
+                Abre el enlace, inicia sesión con la cuenta correcta y acepta. Cuando veas la confirmación del gateway, vuelve aquí y presiona “Ya autoricé”.
+              </p>
+            )}
+
+            <details className="mt-5 border-t border-white/5 pt-4">
+              <summary className="cursor-pointer text-xs font-bold text-wms-muted hover:text-white">La cuenta ya existe en el gateway</summary>
+              <div className="mt-4">
+                <button type="button" onClick={loadGatewayAccounts} disabled={linkingAccount}
+                  className="rounded-lg border border-sky-500/30 px-4 py-2 text-[10px] font-black uppercase text-sky-400 disabled:opacity-50">
+                  {linkingAccount ? 'Consultando…' : 'Ver cuentas disponibles'}
+                </button>
+                {gatewayAccounts.length > 0 && (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {gatewayAccounts.map(account => (
+                      <div key={account.gatewayAccountId} className="flex items-center justify-between gap-3 rounded-xl border border-wms-border bg-wms-bg p-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-black text-white">{account.nickname}</p>
+                          <p className="mt-1 font-mono text-[9px] text-wms-muted">Seller {account.sellerId}</p>
+                        </div>
+                        <button type="button" onClick={() => linkGatewayAccount(account.gatewayAccountId)}
+                          className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-[9px] font-black uppercase text-white">
+                          Agregar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <form onSubmit={linkMlAccount} className="mt-4">
+                <label htmlFor="gateway-account-id" className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">ID de cuenta en el gateway</label>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <div className="relative min-w-0 flex-1">
+                    <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 text-wms-muted" size={18} />
+                    <input
+                      id="gateway-account-id"
+                      value={gatewayAccountId}
+                      onChange={event => setGatewayAccountId(event.target.value)}
+                      placeholder="Ej: a7c9cdcf-4fbb-4e39-be78-a69bfea76d70"
+                      autoComplete="off"
+                      className="min-h-12 w-full rounded-xl border border-wms-border bg-wms-bg pl-11 pr-4 font-mono text-sm text-white outline-none focus:border-sky-500"
+                    />
+                  </div>
+                  <button type="submit" disabled={!gatewayAccountId.trim() || linkingAccount}
+                    className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-sky-500/30 px-6 text-xs font-black uppercase text-sky-400 disabled:opacity-50">
+                    <Plus size={17} /> Vincular ID
+                  </button>
+                </div>
+              </form>
+            </details>
+          </div>
+
+          {mlAccountsLoading ? (
+            <div className="py-16 text-center font-bold text-wms-muted">Cargando cuentas vinculadas...</div>
+          ) : mlAccounts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-wms-border bg-wms-surface py-16 text-center">
+              <Store size={48} className="mx-auto mb-4 text-wms-muted/30" />
+              <p className="font-bold text-white">No hay cuentas de Mercado Libre vinculadas</p>
+              <p className="mt-1 text-sm text-wms-muted">La sincronización no importará órdenes hasta que agregues una.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {mlAccounts.map(account => (
+                <article key={account.id} className="rounded-2xl border border-sky-500/20 bg-wms-surface p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="rounded-xl bg-sky-500/10 p-3 text-sky-400"><Store size={22} /></div>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-black text-white">{account.nickname}</h3>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-green-400">Vinculada</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => unlinkMlAccount(account)}
+                      className="flex shrink-0 items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-400 transition-colors hover:border-red-500/50"
+                    >
+                      <Unlink size={13} /> Quitar
+                    </button>
+                  </div>
+                  <dl className="mt-5 space-y-3 border-t border-white/5 pt-4 text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="font-bold text-wms-muted">Seller ID</dt>
+                      <dd className="font-mono text-white">{account.sellerId}</dd>
+                    </div>
+                    <div>
+                      <dt className="mb-1 font-bold text-wms-muted">ID gateway</dt>
+                      <dd className="break-all font-mono text-[10px] text-white/70">{account.gatewayAccountId}</dd>
+                    </div>
+                    {account.siteId && (
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="font-bold text-wms-muted">Sitio</dt>
+                        <dd className="font-mono text-white">{account.siteId}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {/* ═══════════════════════════════════════════ */}

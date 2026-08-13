@@ -10,7 +10,7 @@ import { prisma } from './prisma';
 const ML_API_BASE = 'https://api.mercadolibre.com';
 const GATEWAY_URL = () => process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com';
 const GATEWAY_API_KEY = () => process.env.ML_GATEWAY_API_KEY || '';
-const ML_ACCOUNT_ID = () => process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70';
+const LEGACY_ACCOUNT_ID = () => process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70';
 
 type LabelResult = {
   buffer: Buffer;
@@ -20,9 +20,9 @@ type LabelResult = {
 /**
  * Obtiene un access_token de ML desde el gateway.
  */
-async function getMLToken(): Promise<string | null> {
+async function getMLToken(gatewayAccountId: string): Promise<string | null> {
   try {
-    const url = `${GATEWAY_URL()}/api/accounts/${ML_ACCOUNT_ID()}/token`;
+    const url = `${GATEWAY_URL()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`;
     const res = await fetch(url, {
       headers: { 'x-api-key': GATEWAY_API_KEY() },
       signal: AbortSignal.timeout(10000),
@@ -67,8 +67,8 @@ async function fetchFromGateway(mlId: string): Promise<Buffer | null> {
  * - Si mlId parece shipment ID (16+ dígitos), intentar shipments/{id}/labels
  * - Si parece order ID (11 dígitos), buscar la orden primero para obtener shipping.id
  */
-async function fetchFromMLDirect(mlId: string): Promise<Buffer | null> {
-  const token = await getMLToken();
+async function fetchFromMLDirect(mlId: string, gatewayAccountId: string): Promise<Buffer | null> {
+  const token = await getMLToken(gatewayAccountId);
   if (!token) return null;
 
   const headers = { 'Authorization': `Bearer ${token}` };
@@ -228,10 +228,14 @@ export async function fetchLabel(mlId: string): Promise<LabelResult> {
   // Look up real shipping ID from DB (mlId is now ML order ID, but labels need shipping ID)
   const order = await prisma.order.findUnique({ 
     where: { mlId },
-    select: { shippingId: true, mlOrderId: true }
+    select: {
+      shippingId: true,
+      mlOrderId: true,
+      mlAccount: { select: { gatewayAccountId: true } },
+    }
   });
   const shippingId = order?.shippingId || mlId;
-  const mlOrderId = order?.mlOrderId ? String(order.mlOrderId) : mlId;
+  const gatewayAccountId = order?.mlAccount?.gatewayAccountId || LEGACY_ACCOUNT_ID();
 
   // 1. Gateway (uses shipping ID — the external ID the gateway expects)
   const gatewayBuf = await fetchFromGateway(shippingId);
@@ -241,7 +245,7 @@ export async function fetchLabel(mlId: string): Promise<LabelResult> {
   }
 
   // 2. ML directo (uses shipping ID for direct API call)
-  const mlBuf = await fetchFromMLDirect(shippingId);
+  const mlBuf = await fetchFromMLDirect(shippingId, gatewayAccountId);
   if (mlBuf && mlBuf.length > 100) {
     console.log(`[LabelService] ✅ Etiqueta obtenida desde ML directo para ${mlId} (shippingId=${shippingId})`);
     return { buffer: mlBuf, source: 'ml-direct' };

@@ -3,6 +3,7 @@ import RedisManager from './redis';
 import { fetchPendingOrders, fetchSingleOrder } from './mercadolibre';
 import { generateSku, extractFamilyBase } from './sku-generator';
 import { normalizeProductCode } from './product-matching';
+import { getActiveMlAccounts } from './ml-accounts';
 
 type RawItem = {
   listingId?: string;
@@ -129,7 +130,8 @@ export type ResolveStats = {
 
 async function resolveItems(
   rawItems: RawItem[],
-  mlIdStr: string
+  mlIdStr: string,
+  marketplaceAccountId: string,
 ): Promise<{ itemsToCreate: any[]; anyItemNeedsResolution: boolean; stats: ResolveStats }> {
   const itemsToCreate: any[] = [];
   let anyItemNeedsResolution = false;
@@ -153,7 +155,7 @@ async function resolveItems(
       where: {
         marketplace_accountId_listingId_variationId: {
           marketplace: 'MERCADOLIBRE',
-          accountId: process.env.ML_ACCOUNT_ID || 'default',
+          accountId: marketplaceAccountId,
           listingId: rawItem.listingId,
           variationId: rawItem.variationId || ''
         }
@@ -284,7 +286,7 @@ async function resolveItems(
         where: {
           marketplace_accountId_listingId_variationId: {
             marketplace: 'MERCADOLIBRE',
-            accountId: process.env.ML_ACCOUNT_ID || 'default',
+            accountId: marketplaceAccountId,
             listingId: rawItem.listingId,
             variationId: rawItem.variationId || ''
           }
@@ -296,7 +298,7 @@ async function resolveItems(
         },
         create: {
           marketplace: 'MERCADOLIBRE',
-          accountId: process.env.ML_ACCOUNT_ID || 'default',
+          accountId: marketplaceAccountId,
           listingId: rawItem.listingId,
           variationId: rawItem.variationId || '',
           sellerSku: itemSku || null,
@@ -346,6 +348,7 @@ export async function refreshOrder(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
+      mlAccount: { select: { gatewayAccountId: true } },
       items: {
         include: {
           product: { select: { id: true, sku: true } }
@@ -369,7 +372,10 @@ export async function refreshOrder(orderId: string) {
     throw new Error(`La orden ${orderId} no tiene mlOrderId. Solo las órdenes sincronizadas después de la actualización tienen este campo.`);
   }
 
-  const freshData = await fetchSingleOrder(order.mlOrderId);
+  const freshData = await fetchSingleOrder(
+    order.mlOrderId,
+    order.mlAccount?.gatewayAccountId || process.env.ML_ACCOUNT_ID,
+  );
   if (!freshData) {
     return null;
   }
@@ -411,7 +417,11 @@ export async function refreshOrder(orderId: string) {
   const rawItems: RawItem[] = JSON.parse(freshData.items_json);
   
   // Resolver productos (crear solo los que no existan en DB)
-  const { itemsToCreate } = await resolveItems(rawItems, order.mlId);
+  const { itemsToCreate } = await resolveItems(
+    rawItems,
+    order.mlId,
+    order.mlAccount?.gatewayAccountId || process.env.ML_ACCOUNT_ID || 'default',
+  );
 
   // Sincronizar items usando upsert con unique constraint (orderId + productId)
   // Esto previene duplicados incluso en race conditions (2+ refreshes concurrentes)
@@ -476,8 +486,26 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
   const syncStart = Date.now();
 
   try {
-    // 1. Obtener órdenes directo desde la API de MercadoLibre
-    const shipments = await fetchPendingOrders(limit, offset);
+    // 1. Obtener órdenes de todas las cuentas vinculadas. Un fallo aislado no
+    // impide sincronizar las demás cuentas.
+    const accounts = await getActiveMlAccounts();
+    const shipments = [] as Awaited<ReturnType<typeof fetchPendingOrders>>;
+    const accountErrors: string[] = [];
+    for (const account of accounts) {
+      try {
+        shipments.push(...await fetchPendingOrders(limit, offset, account));
+      } catch (error: any) {
+        const message = `${account.nickname}: ${error.message || 'error desconocido'}`;
+        accountErrors.push(message);
+        console.error(`[Sync] Falló cuenta ML ${message}`);
+      }
+    }
+    if (accounts.length > 0 && accountErrors.length === accounts.length) {
+      throw new Error(`No se pudo sincronizar ninguna cuenta de Mercado Libre. ${accountErrors.join(' | ')}`);
+    }
+    const localAccountIdByGatewayId = new Map(
+      accounts.filter(account => account.id).map(account => [account.gatewayAccountId, account.id!]),
+    );
 
     let importedCount = 0;
     let skippedCount = 0;
@@ -538,8 +566,10 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
         const needsMetadataUpdate = !existingOrder.mlOrderId || !existingOrder.shippingId;
         const needsMlIdFix = existingOrder.mlId !== mlIdStr; // mlId viejo era shipping ID (2000...)
         const needsPriorityUpdate = existingOrder.priorityMessage !== priorityMessage;
+        const localAccountId = localAccountIdByGatewayId.get(shipment.accountId);
+        const needsAccountUpdate = Boolean(localAccountId && existingOrder.mlAccountId !== localAccountId);
 
-        if (needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate) {
+        if (needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate || needsAccountUpdate) {
           await prisma.order.update({
             where: { id: existingOrder.id },
             data: {
@@ -550,6 +580,7 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
               isFlex: shipment.is_flex ?? undefined,
               buyerName: shipment.buyer_name ?? undefined,
               priorityMessage,
+              mlAccountId: localAccountId,
             }
           });
           
@@ -577,7 +608,11 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
         image: shipment.item_image
       }];
 
-      const { itemsToCreate, anyItemNeedsResolution, stats } = await resolveItems(rawItems, mlIdStr);
+      const { itemsToCreate, anyItemNeedsResolution, stats } = await resolveItems(
+        rawItems,
+        mlIdStr,
+        shipment.accountId,
+      );
       totalReusedSku += stats.reusedSku;
       totalReusedAlias += stats.reusedAlias;
       totalAutoCreated += stats.autoCreated;
@@ -621,7 +656,8 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
             status: newStatus,
             isFlex,
             priorityMessage,
-            buyerName
+            buyerName,
+            mlAccountId: localAccountIdByGatewayId.get(shipment.accountId),
           }
         });
 
@@ -668,6 +704,7 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
         id: true,
         status: true,
         mlOrderId: true,
+        mlAccountId: true,
         updatedAt: true,
         items: {
           select: {
