@@ -69,6 +69,7 @@ interface Order {
   status: string;
   createdAt: string;
   isFlex: boolean;
+  isTurbo: boolean;
   priorityMessage: string | null;
   buyerName?: string;
   items: OrderItem[];
@@ -167,6 +168,7 @@ export default function PickingPage() {
           createdAt: primary.createdAt,
           status: sortedGroup.some(o => o.status === 'PICKING') ? 'PICKING' : 'PENDING',
           isFlex: sortedGroup.some(o => o.isFlex),
+          isTurbo: sortedGroup.some(o => o.isTurbo),
           priorityMessage: sortedGroup.find(o => o.priorityMessage)?.priorityMessage || primary.priorityMessage,
           buyerName: sortedGroup.map(o => o.buyerName).filter(Boolean).join(' / ') || primary.buyerName,
           items: mergedItems,
@@ -324,6 +326,7 @@ export default function PickingPage() {
   // Ordenar órdenes FIFO: más antiguas primero (por createdAt)
   const sortedOrders = useMemo(() => {
     return [...groupedOrdersList].sort((a, b) => {
+      if (a.isTurbo !== b.isTurbo) return a.isTurbo ? -1 : 1;
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
   }, [groupedOrdersList]);
@@ -674,7 +677,7 @@ export default function PickingPage() {
                 )}
               </div>
             ) : filteredOrders.map(o => (
-              <div key={o.id} className={`bg-wms-card border-wms-border/60 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] hover:border-leon-red/50 transition-all duration-300 group shadow-xl flex flex-col justify-between gap-5 sm:gap-6 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] ${o.isFlex ? 'border-leon-red/40 bg-gradient-to-br from-leon-red/5 via-transparent to-transparent hover:border-leon-red/60' : 'border-wms-border'}`}>
+              <div key={o.id} className={`bg-wms-card border p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] hover:border-leon-red/50 transition-all duration-300 group shadow-xl flex flex-col justify-between gap-5 sm:gap-6 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] ${o.isTurbo ? 'border-amber-400/70 bg-gradient-to-br from-amber-500/15 via-transparent to-transparent ring-1 ring-amber-400/20' : o.isFlex ? 'border-leon-red/40 bg-gradient-to-br from-leon-red/5 via-transparent to-transparent hover:border-leon-red/60' : 'border-wms-border'}`}>
                 
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
@@ -683,7 +686,11 @@ export default function PickingPage() {
                         <h3 className="text-xl font-black text-white group-hover:text-leon-red transition-colors font-mono tracking-tight" title={`Pack: ML-${o.mlId}`}>
                           ML-{o.mlId}
                         </h3>
-                        {o.isFlex && (
+                        {o.isTurbo ? (
+                          <span className="inline-flex items-center rounded bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/20">
+                            TURBO
+                          </span>
+                        ) : o.isFlex && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-leon-red/10 border border-leon-red/35 text-leon-red-light">
                             FLEX
                           </span>

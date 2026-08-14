@@ -152,6 +152,7 @@ model Order {
   packingStation String?
   shippedAt      DateTime?
   isFlex         Boolean     @default(false)
+  isTurbo        Boolean     @default(false)
   priorityMessage String?
   buyerName      String?
   pickingMethod  String?

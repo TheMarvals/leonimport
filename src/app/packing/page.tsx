@@ -33,6 +33,7 @@ interface Order {
   status: string;
   lockedBy?: string | null;
   isFlex: boolean;
+  isTurbo: boolean;
   priorityMessage: string | null;
   buyerName: string | null;
   cubicle: { id: string; number: number } | null;
@@ -119,6 +120,7 @@ export default function PackingPage() {
           status: 'PACKING',
           lockedBy: primary.lockedBy,
           isFlex: sortedGroup.some(o => o.isFlex),
+          isTurbo: sortedGroup.some(o => o.isTurbo),
           priorityMessage: sortedGroup.find(o => o.priorityMessage)?.priorityMessage || primary.priorityMessage,
           buyerName: sortedGroup.map(o => o.buyerName).filter(Boolean).join(' / ') || primary.buyerName,
           cubicle: primary.cubicle,
@@ -535,6 +537,7 @@ export default function PackingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {groupedOrdersList
               .sort((a, b) => {
+                if (a.isTurbo !== b.isTurbo) return a.isTurbo ? -1 : 1;
                 if (a.isFlex && !b.isFlex) return -1;
                 if (!a.isFlex && b.isFlex) return 1;
                 return 0;
@@ -546,16 +549,17 @@ export default function PackingPage() {
               </div>
             ) : groupedOrdersList
               .sort((a, b) => {
+                if (a.isTurbo !== b.isTurbo) return a.isTurbo ? -1 : 1;
                 if (a.isFlex && !b.isFlex) return -1;
                 if (!a.isFlex && b.isFlex) return 1;
                 return 0;
               })
               .map(o => (
-              <div key={o.id} className={`bg-wms-surface border p-4 sm:p-6 rounded-2xl flex flex-col justify-between gap-5 sm:gap-6 hover:border-leon-red/50 transition-colors relative overflow-hidden ${o.isFlex ? 'border-leon-red/50 bg-leon-red/5' : 'border-wms-border'}`}>
-                {o.isFlex && (
+              <div key={o.id} className={`bg-wms-surface border p-4 sm:p-6 rounded-2xl flex flex-col justify-between gap-5 sm:gap-6 hover:border-leon-red/50 transition-colors relative overflow-hidden ${o.isTurbo ? 'border-amber-400/70 bg-amber-500/10 ring-1 ring-amber-400/20' : o.isFlex ? 'border-leon-red/50 bg-leon-red/5' : 'border-wms-border'}`}>
+                {(o.isTurbo || o.isFlex) && (
                    <div className="absolute top-0 right-0">
-                    <div className="bg-leon-red text-white text-[8px] font-black px-3 py-0.5 uppercase tracking-widest rounded-bl-lg shadow-lg">
-                      FLEX
+                    <div className={`${o.isTurbo ? 'bg-amber-400 text-black' : 'bg-leon-red text-white'} text-[8px] font-black px-3 py-0.5 uppercase tracking-widest rounded-bl-lg shadow-lg`}>
+                      {o.isTurbo ? 'TURBO' : 'FLEX'}
                     </div>
                   </div>
                 )}

@@ -131,6 +131,7 @@ export type MlShipment = {
   sender_id: number;
   receiver_id: number;
   tracking_number?: string;
+  tags?: string[];
   shipping_details?: {
     delivery_promise?: {
       display_text?: string;
@@ -364,6 +365,7 @@ export type MlShipmentOrder = {
   item_price: number;
   item_image: string | null;
   is_flex: boolean;
+  is_turbo: boolean;
   logistic_type: string;
   shipping_details: object | null;
   buyer_name: string | null;
@@ -486,6 +488,7 @@ export async function fetchPendingOrders(
     const firstItem = mappedItems[0] || { sku: '', title: '', quantity: 0, price: 0, image: null };
     const logisticType = shipment?.logistic_type || order.shipping?.logistic_type || '';
     const isFlex = logisticType === 'self_service';
+    const isTurbo = shipment?.tags?.some(tag => tag.toLowerCase() === 'turbo') ?? false;
 
     let shippingDetails: object | null = null;
     if (shipment?.shipping_details) {
@@ -512,6 +515,7 @@ export async function fetchPendingOrders(
       item_price: firstItem.price,
       item_image: firstItem.image,
       is_flex: isFlex,
+      is_turbo: isTurbo,
       logistic_type: logisticType,
       shipping_details: shippingDetails,
       buyer_name: buyerName,
@@ -627,6 +631,7 @@ export async function fetchSingleOrder(
   const firstItem = mappedItems[0] || { sku: '', title: '', quantity: 0, price: 0, image: null };
   const logisticType = shipment?.logistic_type || orderDetail.shipping?.logistic_type || '';
   const isFlex = logisticType === 'self_service';
+  const isTurbo = shipment?.tags?.some(tag => tag.toLowerCase() === 'turbo') ?? false;
 
   let shippingDetails: object | null = null;
   if (shipment?.shipping_details) {
@@ -652,6 +657,7 @@ export async function fetchSingleOrder(
     item_price: firstItem.price,
     item_image: firstItem.image,
     is_flex: isFlex,
+    is_turbo: isTurbo,
     logistic_type: logisticType,
     shipping_details: shippingDetails,
     buyer_name: buyerName,

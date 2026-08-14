@@ -128,6 +128,17 @@ export type ResolveStats = {
   missingCreated: number;
 };
 
+/**
+ * Algunos vendedores usan códigos de operador/proveedor (por ejemplo "IRM")
+ * como seller_sku. No son una identidad de producto suficientemente específica
+ * y pueden vincular publicaciones completamente distintas por accidente.
+ */
+function isSpecificMarketplaceSku(value?: string | null): value is string {
+  if (!value) return false;
+  const normalized = normalizeProductCode(value);
+  return normalized.length >= 4 && /\d/.test(normalized);
+}
+
 async function resolveItems(
   rawItems: RawItem[],
   mlIdStr: string,
@@ -185,7 +196,7 @@ async function resolveItems(
     // Paso 2: Si no se encontró por SKU, buscar por alias, título o nombre
     if (!product) {
       const orConditions: any[] = [];
-      if (itemSku) orConditions.push({ mlAliases: { has: itemSku } });
+      if (isSpecificMarketplaceSku(itemSku)) orConditions.push({ mlAliases: { has: itemSku } });
       if (itemTitle) {
         orConditions.push({ mlAliases: { has: itemTitle } });
         // También buscar por nombre exacto (insensible a mayúsculas)
@@ -310,7 +321,7 @@ async function resolveItems(
         }
       });
 
-      if (itemSku && itemSku !== product.sku && !product.mlAliases.includes(itemSku)) {
+      if (isSpecificMarketplaceSku(itemSku) && itemSku !== product.sku && !product.mlAliases.includes(itemSku)) {
         await prisma.product.update({
           where: { id: product.id },
           data: { mlAliases: { push: itemSku } }
@@ -383,6 +394,7 @@ export async function refreshOrder(orderId: string) {
   // 3. Calcular prioridad (formato amigable)
   const shippingDetails = freshData.shipping_details || null;
   const isFlex = freshData.is_flex === true || freshData.logistic_type === 'self_service';
+  const isTurbo = freshData.is_turbo === true;
   const priorityMessage = formatPriorityMessage(
     freshData.logistic_type || '',
     isFlex,
@@ -403,10 +415,11 @@ export async function refreshOrder(orderId: string) {
     data: {
       status: newStatus !== order.status ? newStatus : undefined,
       isFlex,
+      isTurbo,
       priorityMessage,
       buyerName: freshData.buyer_name ?? undefined,
       shippingId: freshData.ml_shipping_id ?? undefined,
-    }
+    } as any
   });
 
   if (newStatus !== order.status) {
@@ -538,6 +551,7 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
       // --- CÁLCULO DE PRIORIDAD (formato amigable) ---
       const shippingDetails = shipment.shipping_details || null;
       const isFlex = shipment.is_flex === true || shipment.logistic_type === 'self_service';
+      const isTurbo = shipment.is_turbo === true;
       const priorityMessage = formatPriorityMessage(
         shipment.logistic_type || '',
         isFlex,
@@ -566,10 +580,11 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
         const needsMetadataUpdate = !existingOrder.mlOrderId || !existingOrder.shippingId;
         const needsMlIdFix = existingOrder.mlId !== mlIdStr; // mlId viejo era shipping ID (2000...)
         const needsPriorityUpdate = existingOrder.priorityMessage !== priorityMessage;
+        const needsTurboUpdate = (existingOrder as any).isTurbo !== isTurbo;
         const localAccountId = localAccountIdByGatewayId.get(shipment.accountId);
         const needsAccountUpdate = Boolean(localAccountId && existingOrder.mlAccountId !== localAccountId);
 
-        if (needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate || needsAccountUpdate) {
+        if (needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate || needsAccountUpdate || needsTurboUpdate) {
           await prisma.order.update({
             where: { id: existingOrder.id },
             data: {
@@ -578,10 +593,11 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
               mlOrderId: shipment.ml_order_id ?? undefined,
               shippingId: shipment.ml_shipping_id ?? undefined,
               isFlex: shipment.is_flex ?? undefined,
+              isTurbo,
               buyerName: shipment.buyer_name ?? undefined,
               priorityMessage,
               mlAccountId: localAccountId,
-            }
+            } as any
           });
           
           if (needsStatusUpdate) {
@@ -655,10 +671,11 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
             shippingId: shipment.ml_shipping_id,
             status: newStatus,
             isFlex,
+            isTurbo,
             priorityMessage,
             buyerName,
             mlAccountId: localAccountIdByGatewayId.get(shipment.accountId),
-          }
+          } as any
         });
 
         // 2. Crear/actualizar cada OrderItem con upsert (maneja duplicados productId)
