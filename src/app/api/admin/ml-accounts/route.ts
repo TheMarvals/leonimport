@@ -16,6 +16,17 @@ const gatewayHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
+async function fetchGatewayAccounts() {
+  const response = await fetch(`${getMlGatewayUrl()}/api/accounts`, {
+    headers: gatewayHeaders(),
+    signal: AbortSignal.timeout(10000),
+    cache: 'no-store',
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'No se pudieron consultar las cuentas del gateway');
+  return Array.isArray(data.accounts) ? data.accounts : [];
+}
+
 async function inspectGatewayAccount(gatewayAccountId: string) {
   const tokenResponse = await fetch(
     `${getMlGatewayUrl()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`,
@@ -73,10 +84,36 @@ export async function GET() {
     });
   }
 
-  const accounts = await prisma.mercadoLibreAccount.findMany({
+  let accounts = await prisma.mercadoLibreAccount.findMany({
     where: { isActive: true },
     orderBy: { createdAt: 'asc' },
   });
+
+  // El primer registro histórico podía nacer con un nickname de placeholder
+  // desde .env. Reconciliamos la identidad canónica sin tocar el alias local.
+  try {
+    const gatewayAccounts = await fetchGatewayAccounts();
+    const gatewayById = new Map(gatewayAccounts.map((account: any) => [String(account.ml_account_id), account]));
+    await Promise.all(accounts.map(account => {
+      const gatewayAccount: any = gatewayById.get(account.gatewayAccountId);
+      if (!gatewayAccount) return Promise.resolve(account);
+      const nickname = String(gatewayAccount.ml_nickname || `ML ${gatewayAccount.ml_user_id}`);
+      const sellerId = String(gatewayAccount.ml_user_id || account.sellerId);
+      const siteId = gatewayAccount.site_id ? String(gatewayAccount.site_id) : account.siteId;
+      if (nickname === account.nickname && sellerId === account.sellerId && siteId === account.siteId) return Promise.resolve(account);
+      return prisma.mercadoLibreAccount.update({
+        where: { id: account.id },
+        data: { nickname, sellerId, siteId },
+      });
+    }));
+    accounts = await prisma.mercadoLibreAccount.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  } catch (error) {
+    console.warn('[ML Accounts] No se pudo refrescar la identidad desde el gateway:', error);
+  }
+
   return NextResponse.json(accounts);
 }
 
@@ -89,15 +126,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     if (body.action === 'list_gateway_accounts') {
-      const response = await fetch(`${getMlGatewayUrl()}/api/accounts`, {
-        headers: gatewayHeaders(),
-        signal: AbortSignal.timeout(10000),
-        cache: 'no-store',
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'No se pudieron consultar las cuentas del gateway');
+      const gatewayAccounts = await fetchGatewayAccounts();
       return NextResponse.json({
-        accounts: (data.accounts || []).map((account: any) => ({
+        accounts: gatewayAccounts.map((account: any) => ({
           gatewayAccountId: String(account.ml_account_id),
           sellerId: String(account.ml_user_id),
           nickname: String(account.ml_nickname || `ML ${account.ml_user_id}`),
@@ -135,14 +166,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Falta identificar el enlace de autorización' }, { status: 400 });
       }
 
-      const response = await fetch(
-        `${getMlGatewayUrl()}/api/accounts`,
-        { headers: gatewayHeaders(), signal: AbortSignal.timeout(10000), cache: 'no-store' },
-      );
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'No se pudieron consultar las cuentas del gateway');
-
-      const gatewayAccount = (data.accounts || []).find((account: any) => account.client_id === clientId);
+      const gatewayAccounts = await fetchGatewayAccounts();
+      const gatewayAccount = gatewayAccounts.find((account: any) => account.client_id === clientId);
       if (!gatewayAccount) {
         return NextResponse.json({
           error: 'La autorización aún no aparece completada. Termina el proceso en Mercado Libre y vuelve a intentar.',
