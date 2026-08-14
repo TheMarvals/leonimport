@@ -143,6 +143,45 @@ No. Para este despliegue se utiliza un solo par de firma para todo el WMS:
 
 No se genera una clave privada del WMS por mesa. Crear pares distintos aumentaría innecesariamente el mantenimiento y no aporta aislamiento, porque todas las estaciones autorizan la misma aplicación y dominio.
 
+### Certificados generados para León Import
+
+El paquete generado se encuentra localmente en `.qz-certs/`. La carpeta está excluida de Git porque contiene claves privadas.
+
+| Archivo | Destino | Confidencialidad |
+| --- | --- | --- |
+| `override.crt` | Copiar a todas las estaciones y configurar como raíz de confianza de QZ | Público |
+| `leonimport-qz-root-ca.crt` | Respaldo público de la CA | Público |
+| `leonimport-qz-root-ca-private.pem` | Respaldo offline; solo se usa para renovar certificados de firma | Secreto crítico |
+| `leonimport-wms-qz-digital-certificate.txt` | Valor de `QZ_CERTIFICATE` en el servidor | Público |
+| `leonimport-wms-qz-signing-private.pem` | Valor de `QZ_PRIVATE_KEY` en el servidor | Secreto |
+
+La CA raíz vence el 11 de agosto de 2036 y su huella SHA-256 es:
+
+```text
+EA:38:33:6D:C5:D6:C0:AF:E1:AA:06:2A:19:D6:39:A1:66:1A:42:2D:42:FD:03:99:6A:A5:62:C8:33:81:D8:DA
+```
+
+El certificado de firma del WMS vence el 13 de agosto de 2029. Debe programarse su renovación antes de esa fecha; la CA instalada en las estaciones puede mantenerse.
+
+Los valores ya preparados en el `.env` local usan el prefijo `base64:`. Base64 evita problemas con saltos de línea, pero no cifra ni protege la clave. Para producción hay que copiar las mismas variables al `.env` real del servidor o a su gestor de secretos y reiniciar el servicio WMS.
+
+### Instalar la raíz pública en una estación
+
+1. Copiar únicamente `.qz-certs/override.crt` al PC.
+2. Cerrar QZ Tray completamente.
+3. Con permisos de administrador, colocar `override.crt` dentro del directorio de instalación de QZ Tray. En Windows normalmente es `C:\Program Files\QZ Tray\override.crt`.
+4. Si QZ no lo detecta automáticamente, abrir `qz-tray.properties` desde **QZ Tray → Advanced → Diagnostic → Browse App Folder** y agregar:
+
+   ```properties
+   authcert.override=C:\Program Files\QZ Tray\override.crt
+   ```
+
+5. Iniciar QZ Tray nuevamente.
+6. Abrir el WMS, detectar impresoras y realizar una prueba.
+7. Comparar la huella del archivo recibido con la huella SHA-256 documentada antes de instalarlo.
+
+Nunca deben copiarse a una estación `leonimport-qz-root-ca-private.pem` ni `leonimport-wms-qz-signing-private.pem`.
+
 Reglas de seguridad:
 
 - `QZ_PRIVATE_KEY` se configura solamente en el servidor del WMS.

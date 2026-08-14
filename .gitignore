@@ -5,5 +5,6 @@ build/
 .env
 .env.local
 .env.*.local
+.qz-certs/
 creds.md
 database_backup.sql
