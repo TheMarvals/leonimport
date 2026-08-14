@@ -1,6 +1,7 @@
 import { getHighResImageUrl } from './image-utils';
 import RedisManager from './redis';
 import type { MlAccountConfig } from './ml-accounts';
+import { getMlGatewayApiKey, getMlGatewayUrl } from './ml-gateway-config';
 
 /**
  * Cliente directo a la API de MercadoLibre.
@@ -19,8 +20,6 @@ import type { MlAccountConfig } from './ml-accounts';
 const ML_API_BASE = 'https://api.mercadolibre.com';
 
 // Configuración desde .env
-const GATEWAY_URL = () => process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com';
-const GATEWAY_API_KEY = () => process.env.ML_GATEWAY_API_KEY || '';
 const LEGACY_ACCOUNT_ID = () => process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70';
 const LEGACY_SELLER_ID = () => process.env.ML_SELLER_ID || '1513023287';
 
@@ -44,9 +43,9 @@ async function getAccessToken(gatewayAccountId: string): Promise<string> {
     return cached.access_token;
   }
 
-  const url = `${GATEWAY_URL()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`;
+  const url = `${getMlGatewayUrl()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`;
   const res = await fetch(url, {
-    headers: { 'x-api-key': GATEWAY_API_KEY() },
+    headers: { 'x-api-key': getMlGatewayApiKey() },
     signal: AbortSignal.timeout(10000),
   });
 

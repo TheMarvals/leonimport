@@ -6,10 +6,9 @@
  */
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { prisma } from './prisma';
+import { getMlGatewayApiKey, getMlGatewayUrl } from './ml-gateway-config';
 
 const ML_API_BASE = 'https://api.mercadolibre.com';
-const GATEWAY_URL = () => process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com';
-const GATEWAY_API_KEY = () => process.env.ML_GATEWAY_API_KEY || '';
 const LEGACY_ACCOUNT_ID = () => process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70';
 
 type LabelResult = {
@@ -22,9 +21,9 @@ type LabelResult = {
  */
 async function getMLToken(gatewayAccountId: string): Promise<string | null> {
   try {
-    const url = `${GATEWAY_URL()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`;
+    const url = `${getMlGatewayUrl()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`;
     const res = await fetch(url, {
-      headers: { 'x-api-key': GATEWAY_API_KEY() },
+      headers: { 'x-api-key': getMlGatewayApiKey() },
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
@@ -39,8 +38,8 @@ async function getMLToken(gatewayAccountId: string): Promise<string | null> {
  * Intento 1: Obtener etiqueta desde el gateway.
  */
 async function fetchFromGateway(mlId: string): Promise<Buffer | null> {
-  const gatewayUrl = GATEWAY_URL();
-  const apiKey = GATEWAY_API_KEY();
+  const gatewayUrl = getMlGatewayUrl();
+  const apiKey = getMlGatewayApiKey();
   if (!gatewayUrl || !apiKey) return null;
 
   try {

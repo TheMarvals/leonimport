@@ -3,10 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { getLegacyMlAccount } from '@/lib/ml-accounts';
 import { randomUUID } from 'crypto';
-
-const gatewayUrl = () => process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com';
-const gatewayApiKey = () => process.env.ML_GATEWAY_API_KEY || '';
-const gatewayAppId = () => process.env.ML_GATEWAY_APP_ID || 'leon-express';
+import { getMlGatewayApiKey, getMlGatewayAppId, getMlGatewayUrl } from '@/lib/ml-gateway-config';
 
 async function getAdminSession() {
   const session = await getSession();
@@ -14,14 +11,14 @@ async function getAdminSession() {
 }
 
 const gatewayHeaders = () => ({
-  'x-api-key': gatewayApiKey(),
-  'x-app-id': gatewayAppId(),
+  'x-api-key': getMlGatewayApiKey(),
+  'x-app-id': getMlGatewayAppId(),
   'Content-Type': 'application/json',
 });
 
 async function inspectGatewayAccount(gatewayAccountId: string) {
   const tokenResponse = await fetch(
-    `${gatewayUrl()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`,
+    `${getMlGatewayUrl()}/api/accounts/${encodeURIComponent(gatewayAccountId)}/token`,
     {
       headers: gatewayHeaders(),
       signal: AbortSignal.timeout(10000),
@@ -92,7 +89,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     if (body.action === 'list_gateway_accounts') {
-      const response = await fetch(`${gatewayUrl()}/api/accounts`, {
+      const response = await fetch(`${getMlGatewayUrl()}/api/accounts`, {
         headers: gatewayHeaders(),
         signal: AbortSignal.timeout(10000),
         cache: 'no-store',
@@ -111,7 +108,7 @@ export async function POST(request: Request) {
 
     if (body.action === 'generate_link') {
       const clientId = randomUUID();
-      const response = await fetch(`${gatewayUrl()}/api/generate-link`, {
+      const response = await fetch(`${getMlGatewayUrl()}/api/generate-link`, {
         method: 'POST',
         headers: gatewayHeaders(),
         body: JSON.stringify({
@@ -139,7 +136,7 @@ export async function POST(request: Request) {
       }
 
       const response = await fetch(
-        `${gatewayUrl()}/api/accounts`,
+        `${getMlGatewayUrl()}/api/accounts`,
         { headers: gatewayHeaders(), signal: AbortSignal.timeout(10000), cache: 'no-store' },
       );
       const data = await response.json().catch(() => ({}));
