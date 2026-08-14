@@ -357,7 +357,7 @@ export default function PackingPage() {
         const printRes = await fetch('/api/print', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mlId: primaryMlId })
+          body: JSON.stringify({ mlId: primaryMlId, station: selectedStation })
         });
 
         if (printRes.ok) {

@@ -326,18 +326,53 @@ export default function InventarioPage() {
     else setSelected(new Set(filtered.map(p => p.id)));
   };
 
-  const printLabels = () => {
-    if (selected.size === 0) return;
-    const ids = Array.from(selected);
-    const counts = ids.map(() => 1).join(',');
-    window.open(`/api/labels?ids=${ids.join(',')}&counts=${counts}&size=${labelSize}`, '_blank');
+  const sendSkuLabelsToPrinter = async (ids: string[], counts: string[]) => {
+    const manualUrl = `/api/labels?ids=${ids.join(',')}&counts=${counts.join(',')}&size=${labelSize}`;
+    // La pestaña se abre dentro del clic para que el navegador no bloquee el
+    // fallback mientras esperamos la respuesta de PrintNode.
+    const printTab = window.open('about:blank', '_blank');
+    if (printTab) {
+      printTab.document.title = 'Preparando etiquetas SKU...';
+      printTab.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Preparando etiquetas SKU...</p>';
+    }
+
+    try {
+      const response = await fetch('/api/print/sku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, counts, size: labelSize }),
+      });
+      if (response.ok) {
+        printTab?.close();
+        showToast('Etiquetas enviadas a la impresora de bodega.', 'success');
+        return;
+      }
+
+      if (printTab && !printTab.closed) {
+        printTab.location.href = manualUrl;
+        showToast('PrintNode no está disponible. Etiquetas abiertas para impresión manual.', 'info');
+      } else {
+        await showModalAlert('Impresión manual requerida', 'Habilita las ventanas emergentes y vuelve a imprimir.', 'warning');
+      }
+    } catch {
+      if (printTab && !printTab.closed) printTab.location.href = manualUrl;
+      else await showModalAlert('Impresión manual requerida', 'No se pudo conectar con PrintNode y el navegador bloqueó la pestaña.', 'warning');
+    }
   };
 
-  const printSingleProduct = () => {
+  const printLabels = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    await sendSkuLabelsToPrinter(ids, ids.map(() => '1'));
+  };
+
+  const printSingleProduct = async () => {
     if (!printingProduct) return;
-    window.open(`/api/labels?ids=${printingProduct.id}&counts=${printQty}&size=${labelSize}`, '_blank');
+    const productId = printingProduct.id;
+    const quantity = printQty;
     setPrintingProduct(null);
     setPrintQty('1');
+    await sendSkuLabelsToPrinter([productId], [quantity]);
   };
 
   const openSupplierEditor = (supplier: Supplier) => {

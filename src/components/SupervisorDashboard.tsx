@@ -36,8 +36,9 @@ import CubicleManager from '@/components/CubicleManager';
 import ProductMergeManager from '@/components/ProductMergeManager';
 import UserManager from '@/components/UserManager';
 import MlAccountManager from '@/components/MlAccountManager';
+import PrinterManager from '@/components/PrinterManager';
 
-type Tab = 'ml-missing' | 'conflicts' | 'history' | 'audit' | 'cubicles' | 'merge' | 'users' | 'ml-accounts';
+type Tab = 'ml-missing' | 'conflicts' | 'history' | 'audit' | 'cubicles' | 'merge' | 'users' | 'ml-accounts' | 'printers';
 
 interface ConflictItem {
   id: string;
@@ -63,7 +64,7 @@ export const SupervisorDashboard = () => {
 
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get('tab');
-    const validTabs: Tab[] = ['ml-missing', 'conflicts', 'history', 'audit', 'cubicles', 'merge', 'users', 'ml-accounts'];
+    const validTabs: Tab[] = ['ml-missing', 'conflicts', 'history', 'audit', 'cubicles', 'merge', 'users', 'ml-accounts', 'printers'];
     if (requestedTab && validTabs.includes(requestedTab as Tab)) {
       setActiveTab(requestedTab as Tab);
     }
@@ -586,6 +587,14 @@ export const SupervisorDashboard = () => {
           }`}>
           <Link2 size={15} /> CUENTAS ML
         </button>
+        <button onClick={() => setActiveTab('printers')}
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'printers'
+              ? 'bg-cyan-500/10 border border-cyan-500/35 text-cyan-400 font-black shadow-inner'
+              : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
+          }`}>
+          <Printer size={15} /> IMPRESORAS
+        </button>
         <Link href="/supervisor/sync"
           className="justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 text-wms-muted hover:text-white hover:bg-white/5 border border-transparent">
           <Activity size={15} /> SYNC
@@ -599,6 +608,8 @@ export const SupervisorDashboard = () => {
       {activeTab === 'users' && <UserManager />}
 
       {activeTab === 'ml-accounts' && <MlAccountManager />}
+
+      {activeTab === 'printers' && <PrinterManager />}
 
       {/* ═══════════════════════════════════ */}
       {/* TAB: ML-MISSING */}
@@ -873,7 +884,7 @@ export const SupervisorDashboard = () => {
                                 const printRes = await fetch('/api/print', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ mlId: o.mlId })
+                                  body: JSON.stringify({ mlId: o.mlId, station: o.packingStation })
                                 });
                                 if (printRes.ok) {
                                   setIsPrinting(false);
@@ -1034,7 +1045,7 @@ export const SupervisorDashboard = () => {
                                     const printRes = await fetch('/api/print', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ mlId: o.mlId })
+                                      body: JSON.stringify({ mlId: o.mlId, station: o.packingStation })
                                     });
                                     if (printRes.ok) {
                                       if (printTab && !printTab.closed) {

@@ -228,6 +228,27 @@ model SyncLog {
   createdAt          DateTime    @default(now())
 }
 
+/// Impresora física publicada por PrintNode. La asignación vive en el WMS,
+/// mientras la API key permanece únicamente en el entorno del servidor.
+model PrinterConfig {
+  id          String         @id @default(uuid())
+  name        String
+  printNodeId Int            @unique
+  purpose     PrinterPurpose
+  stationName String?
+  labelSize   String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([purpose, stationName, isActive])
+}
+
+enum PrinterPurpose {
+  PACKING
+  SKU
+}
+
 enum SyncStatus {
   SUCCESS
   ERROR
