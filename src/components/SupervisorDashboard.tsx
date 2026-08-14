@@ -83,6 +83,8 @@ export const SupervisorDashboard = () => {
   const [conflictsSearchTerm, setConflictsSearchTerm] = useState('');
   const [auditSearchTerm, setAuditSearchTerm] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState('ALL');
+  const [auditOperatorFilter, setAuditOperatorFilter] = useState('ALL');
+  const [auditQuickFilter, setAuditQuickFilter] = useState<'ALL' | 'OPERATORS' | 'ALERTS'>('ALL');
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
   
   // ─── Pagination states ───
@@ -347,22 +349,38 @@ export const SupervisorDashboard = () => {
   };
 
   const auditActions = [...new Set(auditLogs.map((log: any) => log.action as string))].sort();
+  const auditOperators = Array.from(new Map(
+    auditLogs.filter((log: any) => log.user).map((log: any) => [log.user.id, log.user]),
+  ).values()) as any[];
+  const isAuditIncident = (log: any) => /CANCEL|INVALID|DELETE/.test(log.action);
   const filteredAuditLogs = auditLogs.filter((log: any) => {
     const search = auditSearchTerm.trim().toLowerCase();
     const matchesAction = auditActionFilter === 'ALL' || log.action === auditActionFilter;
+    const matchesOperator = auditOperatorFilter === 'ALL' || log.userId === auditOperatorFilter;
+    const matchesQuickFilter = auditQuickFilter === 'ALL' ||
+      (auditQuickFilter === 'OPERATORS' && Boolean(log.user)) ||
+      (auditQuickFilter === 'ALERTS' && isAuditIncident(log));
     const mlOrderId = String(log.order?.mlOrderId || log.order?.mlId || '');
     const account = log.order?.mlAccount;
     const matchesSearch = !search ||
       log.userId?.toLowerCase().includes(search) ||
+      log.user?.name?.toLowerCase().includes(search) ||
       mlOrderId.toLowerCase().includes(search) ||
       account?.nickname?.toLowerCase().includes(search) ||
       account?.sellerId?.toLowerCase().includes(search) ||
       getActionLabel(log.action).toLowerCase().includes(search) ||
       formatMetadata(log).toLowerCase().includes(search);
-    return matchesAction && matchesSearch;
+    return matchesAction && matchesOperator && matchesQuickFilter && matchesSearch;
   });
-  const auditOperatorCount = new Set(auditLogs.map((log: any) => log.userId)).size;
-  const auditIncidentCount = auditLogs.filter((log: any) => /CANCEL|INVALID|DELETE/.test(log.action)).length;
+  const auditOperatorCount = auditOperators.length;
+  const auditIncidentCount = auditLogs.filter(isAuditIncident).length;
+
+  const showAllAuditEvents = () => {
+    setAuditQuickFilter('ALL');
+    setAuditOperatorFilter('ALL');
+    setAuditActionFilter('ALL');
+    setAuditSearchTerm('');
+  };
 
   return (
     <div className="min-h-screen bg-black text-white p-4 lg:p-6 font-sans md:overflow-hidden md:h-screen flex flex-col">
@@ -1156,15 +1174,15 @@ export const SupervisorDashboard = () => {
               </div>
 
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="min-w-0 rounded-2xl border border-white/5 bg-black/25 p-3 sm:min-w-28"><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Eventos</p><p className="mt-1 text-xl font-black text-white">{auditLogs.length}</p></div>
-                <div className="min-w-0 rounded-2xl border border-white/5 bg-black/25 p-3 sm:min-w-28"><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Operarios</p><p className="mt-1 text-xl font-black text-blue-300">{auditOperatorCount}</p></div>
-                <div className="min-w-0 rounded-2xl border border-white/5 bg-black/25 p-3 sm:min-w-28"><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Alertas</p><p className="mt-1 text-xl font-black text-rose-300">{auditIncidentCount}</p></div>
+                <button type="button" onClick={showAllAuditEvents} aria-pressed={auditQuickFilter === 'ALL'} className={`min-w-0 rounded-2xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:bg-white/[0.06] sm:min-w-28 ${auditQuickFilter === 'ALL' ? 'border-purple-400/50 bg-purple-500/15 ring-1 ring-purple-400/20' : 'border-white/5 bg-black/25'}`}><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Eventos</p><p className="mt-1 text-xl font-black text-white">{auditLogs.length}</p></button>
+                <button type="button" onClick={() => { setAuditQuickFilter('OPERATORS'); setAuditActionFilter('ALL'); setAuditSearchTerm(''); }} aria-pressed={auditQuickFilter === 'OPERATORS'} className={`min-w-0 rounded-2xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:bg-blue-500/10 sm:min-w-28 ${auditQuickFilter === 'OPERATORS' ? 'border-blue-400/50 bg-blue-500/15 ring-1 ring-blue-400/20' : 'border-white/5 bg-black/25'}`}><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Operarios</p><p className="mt-1 text-xl font-black text-blue-300">{auditOperatorCount}</p></button>
+                <button type="button" onClick={() => { setAuditQuickFilter('ALERTS'); setAuditOperatorFilter('ALL'); setAuditActionFilter('ALL'); setAuditSearchTerm(''); }} aria-pressed={auditQuickFilter === 'ALERTS'} className={`min-w-0 rounded-2xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:bg-rose-500/10 sm:min-w-28 ${auditQuickFilter === 'ALERTS' ? 'border-rose-400/50 bg-rose-500/15 ring-1 ring-rose-400/20' : 'border-white/5 bg-black/25'}`}><p className="text-[8px] font-black uppercase tracking-widest text-wms-muted">Alertas</p><p className="mt-1 text-xl font-black text-rose-300">{auditIncidentCount}</p></button>
               </div>
             </div>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-wms-surface shadow-2xl">
-            <div className="grid gap-3 border-b border-white/5 p-4 sm:grid-cols-[1fr_16rem]">
+            <div className="grid gap-3 border-b border-white/5 p-4 sm:grid-cols-2 xl:grid-cols-[1fr_15rem_15rem]">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-wms-muted" size={18} />
                 <input value={auditSearchTerm} onChange={event => setAuditSearchTerm(event.target.value)} placeholder="Buscar por orden ML, cuenta, operario o acción..." className="min-h-12 w-full rounded-xl border border-wms-border bg-black/25 pl-11 pr-4 text-sm text-white outline-none transition-colors placeholder:text-white/20 focus:border-purple-500/60" />
@@ -1174,6 +1192,14 @@ export const SupervisorDashboard = () => {
                 <select value={auditActionFilter} onChange={event => setAuditActionFilter(event.target.value)} className="min-h-12 w-full appearance-none rounded-xl border border-wms-border bg-black/25 pl-11 pr-10 text-xs font-bold uppercase text-white outline-none focus:border-purple-500/60">
                   <option value="ALL">Todas las acciones</option>
                   {auditActions.map(action => <option key={action} value={action}>{getActionLabel(action)}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-wms-muted" size={16} />
+              </div>
+              <div className="relative sm:col-span-2 xl:col-span-1">
+                <UserRound className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-wms-muted" size={17} />
+                <select value={auditOperatorFilter} onChange={event => { setAuditOperatorFilter(event.target.value); setAuditQuickFilter(event.target.value === 'ALL' ? 'ALL' : 'OPERATORS'); }} className="min-h-12 w-full appearance-none rounded-xl border border-wms-border bg-black/25 pl-11 pr-10 text-xs font-bold text-white outline-none focus:border-blue-500/60">
+                  <option value="ALL">Todos los operarios</option>
+                  {auditOperators.map((operator: any) => <option key={operator.id} value={operator.id}>{operator.name} · {operator.role}</option>)}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-wms-muted" size={16} />
               </div>
@@ -1193,7 +1219,7 @@ export const SupervisorDashboard = () => {
                           <p className="flex items-center gap-2 font-mono text-[11px] font-bold text-white"><Clock size={13} className="text-purple-300" /> {new Date(log.timestamp).toLocaleDateString([], { day: '2-digit', month: 'short', year: '2-digit' })}</p>
                           <p className="mt-1 pl-5 font-mono text-[10px] text-wms-muted">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
                         </div>
-                        <div className="flex min-w-0 items-center gap-2"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/5 text-wms-muted"><UserRound size={14} /></div><span className="truncate font-mono text-xs font-bold text-white/85">{log.userId}</span></div>
+                        <div className="flex min-w-0 items-center gap-2"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/5 text-wms-muted"><UserRound size={14} /></div><div className="min-w-0"><p className="truncate text-xs font-bold text-white/85">{log.user?.name || log.userId}</p>{log.user?.role && <p className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-wms-muted">{log.user.role}</p>}</div></div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className={`inline-flex rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${getActionStyle(log.action)}`}>{getActionLabel(log.action)}</span>

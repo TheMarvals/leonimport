@@ -30,8 +30,14 @@ export async function GET(req: NextRequest) {
         },
       },
     });
+    const users = await prisma.user.findMany({
+      where: { id: { in: [...new Set(logs.map(log => log.userId))] } },
+      select: { id: true, name: true, role: true },
+    });
+    const usersById = new Map(users.map(user => [user.id, user]));
     return NextResponse.json(logs.map(log => ({
       ...log,
+      user: usersById.get(log.userId) || null,
       order: log.order ? {
         ...log.order,
         mlOrderId: log.order.mlOrderId?.toString() || log.order.mlId,
