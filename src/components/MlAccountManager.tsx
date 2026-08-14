@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Link2, Plus, Store, Unlink } from 'lucide-react';
+import { Check, Link2, Pencil, Plus, Save, Store, Unlink, X } from 'lucide-react';
 import { showConfirmModal, showToast } from '@/lib/toast';
 
 type MlAccount = {
@@ -10,15 +10,20 @@ type MlAccount = {
   gatewayAccountId: string;
   sellerId: string;
   nickname: string;
+  alias: string | null;
   siteId: string | null;
 };
+type GatewayAccount = Omit<MlAccount, 'id' | 'alias'>;
 
 export default function MlAccountManager() {
   const queryClient = useQueryClient();
   const [gatewayAccountId, setGatewayAccountId] = useState('');
   const [linkingAccount, setLinkingAccount] = useState(false);
   const [authorization, setAuthorization] = useState<{ clientId: string; url: string; expiresAt: string } | null>(null);
-  const [availableAccounts, setAvailableAccounts] = useState<Omit<MlAccount, 'id'>[]>([]);
+  const [availableAccounts, setAvailableAccounts] = useState<GatewayAccount[]>([]);
+  const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
+  const [aliasDraft, setAliasDraft] = useState('');
+  const [savingAlias, setSavingAlias] = useState(false);
 
   const { data: accounts = [], isLoading } = useQuery<MlAccount[]>({
     queryKey: ['admin', 'ml-accounts'],
@@ -139,6 +144,32 @@ export default function MlAccountManager() {
     }
   };
 
+  const startEditingAlias = (account: MlAccount) => {
+    setEditingAliasId(account.id);
+    setAliasDraft(account.alias || '');
+  };
+
+  const saveAlias = async (account: MlAccount) => {
+    if (savingAlias) return;
+    setSavingAlias(true);
+    try {
+      const response = await fetch('/api/admin/ml-accounts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: account.id, alias: aliasDraft }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo guardar el alias');
+      setEditingAliasId(null);
+      await refresh();
+      showToast(aliasDraft.trim() ? 'Alias actualizado correctamente.' : 'Alias eliminado.', 'success');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setSavingAlias(false);
+    }
+  };
+
   return (
     <section className="space-y-6">
       <div>
@@ -236,16 +267,35 @@ export default function MlAccountManager() {
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="rounded-xl bg-sky-500/10 p-3 text-sky-400"><Store size={22} /></div>
                   <div className="min-w-0">
-                    <h3 className="truncate font-black text-white">{account.nickname}</h3>
+                    <h3 className="truncate font-black text-white">{account.alias || account.nickname}</h3>
+                    {account.alias && <p className="mt-0.5 truncate text-[10px] text-wms-muted">ML: {account.nickname}</p>}
                     <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-green-400">Vinculada</p>
                   </div>
                 </div>
-                <button onClick={() => unlinkAccount(account)}
-                  className="flex shrink-0 items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-400 hover:border-red-500/50">
-                  <Unlink size={13} /> Quitar
-                </button>
+                <div className="flex shrink-0 gap-1.5">
+                  <button onClick={() => startEditingAlias(account)} aria-label={`Editar alias de ${account.alias || account.nickname}`}
+                    className="rounded-lg border border-sky-500/20 bg-sky-500/10 p-2 text-sky-400 hover:border-sky-500/50"><Pencil size={14} /></button>
+                  <button onClick={() => unlinkAccount(account)}
+                    className="flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-400 hover:border-red-500/50">
+                    <Unlink size={13} /> Quitar
+                  </button>
+                </div>
               </div>
+              {editingAliasId === account.id && (
+                <div className="mt-4 rounded-xl border border-sky-500/20 bg-sky-500/[0.05] p-3">
+                  <label htmlFor={`alias-${account.id}`} className="text-[9px] font-black uppercase tracking-widest text-sky-300">Alias interno</label>
+                  <p className="mt-1 text-[10px] text-wms-muted">Solo se usa dentro del WMS. Deja el campo vacío para volver al nickname de ML.</p>
+                  <div className="mt-3 flex gap-2">
+                    <input id={`alias-${account.id}`} value={aliasDraft} onChange={event => setAliasDraft(event.target.value)} maxLength={60} autoFocus
+                      onKeyDown={event => { if (event.key === 'Enter') void saveAlias(account); if (event.key === 'Escape') setEditingAliasId(null); }}
+                      placeholder="Ej: Tienda Principal" className="min-h-10 min-w-0 flex-1 rounded-lg border border-wms-border bg-wms-bg px-3 text-sm font-bold text-white outline-none focus:border-sky-500" />
+                    <button type="button" onClick={() => saveAlias(account)} disabled={savingAlias} aria-label="Guardar alias" className="rounded-lg bg-sky-600 p-2.5 text-white disabled:opacity-50"><Save size={16} /></button>
+                    <button type="button" onClick={() => setEditingAliasId(null)} aria-label="Cancelar edición" className="rounded-lg border border-wms-border p-2.5 text-wms-muted hover:text-white"><X size={16} /></button>
+                  </div>
+                </div>
+              )}
               <dl className="mt-5 space-y-3 border-t border-white/5 pt-4 text-xs">
+                <div className="flex items-center justify-between gap-3"><dt className="font-bold text-wms-muted">Nickname ML</dt><dd className="truncate font-bold text-white">{account.nickname}</dd></div>
                 <div className="flex items-center justify-between gap-3"><dt className="font-bold text-wms-muted">Seller ID</dt><dd className="font-mono text-white">{account.sellerId}</dd></div>
                 <div><dt className="mb-1 font-bold text-wms-muted">ID gateway</dt><dd className="break-all font-mono text-[10px] text-white/70">{account.gatewayAccountId}</dd></div>
                 {account.siteId && <div className="flex items-center justify-between gap-3"><dt className="font-bold text-wms-muted">Sitio</dt><dd className="font-mono text-white">{account.siteId}</dd></div>}

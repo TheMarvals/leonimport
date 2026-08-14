@@ -188,6 +188,54 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  const session = await getAdminSession();
+  if (!session) return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+
+  try {
+    const { id, alias: rawAlias } = await request.json();
+    const idValue = String(id || '');
+    const alias = String(rawAlias || '').trim();
+    if (!idValue) return NextResponse.json({ error: 'Falta identificar la cuenta' }, { status: 400 });
+    if (alias.length > 60) return NextResponse.json({ error: 'El alias puede tener hasta 60 caracteres' }, { status: 400 });
+
+    if (alias) {
+      const duplicate = await prisma.mercadoLibreAccount.findFirst({
+        where: { id: { not: idValue }, isActive: true, alias: { equals: alias, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (duplicate) return NextResponse.json({ error: 'Otra cuenta activa ya utiliza este alias' }, { status: 409 });
+    }
+
+    const current = await prisma.mercadoLibreAccount.findUnique({ where: { id: idValue } });
+    if (!current) return NextResponse.json({ error: 'La cuenta no existe' }, { status: 404 });
+
+    const account = await prisma.$transaction(async transaction => {
+      const updated = await transaction.mercadoLibreAccount.update({
+        where: { id: idValue },
+        data: { alias: alias || null },
+      });
+      await transaction.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: 'UPDATE_ML_ACCOUNT_ALIAS',
+          metadata: {
+            sellerId: current.sellerId,
+            nickname: current.nickname,
+            previousAlias: current.alias,
+            newAlias: alias || null,
+          },
+        },
+      });
+      return updated;
+    });
+
+    return NextResponse.json(account);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'No se pudo actualizar el alias' }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   if (!(await getAdminSession())) {
     return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });

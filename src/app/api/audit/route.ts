@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
             mlAccount: {
               select: {
                 nickname: true,
+                alias: true,
                 sellerId: true,
                 gatewayAccountId: true,
               },

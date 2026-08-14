@@ -25,6 +25,7 @@ model MercadoLibreAccount {
   gatewayAccountId String   @unique
   sellerId         String
   nickname         String
+  alias            String?
   siteId           String?
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())

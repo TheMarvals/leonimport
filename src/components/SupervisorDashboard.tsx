@@ -297,6 +297,7 @@ export const SupervisorDashboard = () => {
       'CANCEL_PACKING': 'Packing Cancelado',
       'PACKING_CANCELLED': 'Packing cancelado',
       'MERGE_PRODUCTS': 'Productos Fusionados',
+      'UPDATE_ML_ACCOUNT_ALIAS': 'Alias de cuenta ML actualizado',
     };
     return labels[action] || action.replaceAll('_', ' ').toLowerCase().replace(/^./, letter => letter.toUpperCase());
   };
@@ -344,6 +345,9 @@ export const SupervisorDashboard = () => {
     if (log.action === 'MERGE_PRODUCTS') {
       return `${m.sourceSku || 'Producto duplicado'} fue fusionado dentro de ${m.targetSku || 'producto principal'}.`;
     }
+    if (log.action === 'UPDATE_ML_ACCOUNT_ALIAS') {
+      return `${m.nickname || `Seller ${m.sellerId || 'ML'}`}: ${m.previousAlias || 'sin alias'} → ${m.newAlias || 'sin alias'}.`;
+    }
     const values = Object.values(m).filter(value => value !== null && value !== undefined);
     return values.length ? 'Evento registrado correctamente. Abre el detalle para consultar sus datos.' : 'Evento registrado sin datos adicionales.';
   };
@@ -366,6 +370,7 @@ export const SupervisorDashboard = () => {
       log.userId?.toLowerCase().includes(search) ||
       log.user?.name?.toLowerCase().includes(search) ||
       mlOrderId.toLowerCase().includes(search) ||
+      account?.alias?.toLowerCase().includes(search) ||
       account?.nickname?.toLowerCase().includes(search) ||
       account?.sellerId?.toLowerCase().includes(search) ||
       getActionLabel(log.action).toLowerCase().includes(search) ||
@@ -1224,7 +1229,7 @@ export const SupervisorDashboard = () => {
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className={`inline-flex rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${getActionStyle(log.action)}`}>{getActionLabel(log.action)}</span>
                             {mlOrderId && <span className="inline-flex rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 font-mono text-[9px] font-black text-sky-300">ML #{mlOrderId}</span>}
-                            {mlAccount && <span className="inline-flex rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-300">{mlAccount.nickname}</span>}
+                            {mlAccount && <span className="inline-flex rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-300">{mlAccount.alias || mlAccount.nickname}</span>}
                           </div>
                           <p className="mt-2 text-xs leading-5 text-white/65 sm:text-sm">{formatMetadata(log)}</p>
                         </div>
@@ -1241,7 +1246,8 @@ export const SupervisorDashboard = () => {
                               </div>
                               <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.05] p-3">
                                 <p className="text-[8px] font-black uppercase tracking-widest text-emerald-300/70">Cuenta Mercado Libre</p>
-                                <p className="mt-1 text-xs font-bold text-emerald-200">{mlAccount?.nickname || 'Cuenta histórica no identificada'}</p>
+                                <p className="mt-1 text-xs font-bold text-emerald-200">{mlAccount?.alias || mlAccount?.nickname || 'Cuenta histórica no identificada'}</p>
+                                {mlAccount?.alias && <p className="mt-1 text-[9px] text-white/40">Nickname ML: {mlAccount.nickname}</p>}
                                 {mlAccount?.sellerId && <p className="mt-1 font-mono text-[9px] text-white/40">Seller ID: {mlAccount.sellerId}</p>}
                               </div>
                             </div>
