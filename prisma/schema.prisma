@@ -153,6 +153,7 @@ model Order {
   shippedAt      DateTime?
   isFlex         Boolean     @default(false)
   isTurbo        Boolean     @default(false)
+  isCollection   Boolean     @default(false)
   priorityMessage String?
   buyerName      String?
   pickingMethod  String?

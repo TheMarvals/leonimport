@@ -70,6 +70,7 @@ interface Order {
   createdAt: string;
   isFlex: boolean;
   isTurbo: boolean;
+  isCollection: boolean;
   priorityMessage: string | null;
   buyerName?: string;
   items: OrderItem[];
@@ -169,6 +170,7 @@ export default function PickingPage() {
           status: sortedGroup.some(o => o.status === 'PICKING') ? 'PICKING' : 'PENDING',
           isFlex: sortedGroup.some(o => o.isFlex),
           isTurbo: sortedGroup.some(o => o.isTurbo),
+          isCollection: sortedGroup.some(o => o.isCollection),
           priorityMessage: sortedGroup.find(o => o.priorityMessage)?.priorityMessage || primary.priorityMessage,
           buyerName: sortedGroup.map(o => o.buyerName).filter(Boolean).join(' / ') || primary.buyerName,
           items: mergedItems,
@@ -269,7 +271,7 @@ export default function PickingPage() {
     };
 
     syncSilently();
-    const interval = window.setInterval(syncSilently, 60 * 1000);
+    const interval = window.setInterval(syncSilently, 2 * 60 * 1000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
@@ -690,9 +692,13 @@ export default function PickingPage() {
                           <span className="inline-flex items-center rounded bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/20">
                             TURBO
                           </span>
-                        ) : o.isFlex && (
+                        ) : o.isFlex ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-leon-red/10 border border-leon-red/35 text-leon-red-light">
                             FLEX
+                          </span>
+                        ) : o.isCollection && (
+                          <span className="inline-flex items-center rounded border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-sky-300">
+                            COLECTA
                           </span>
                         )}
                       </div>

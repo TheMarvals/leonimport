@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import RedisManager from './redis';
-import { fetchPendingOrders, fetchSingleOrder } from './mercadolibre';
+import { fetchAllPendingOrders, fetchPendingOrders, fetchSingleOrder } from './mercadolibre';
 import { generateSku, extractFamilyBase } from './sku-generator';
 import { normalizeProductCode } from './product-matching';
 import { getActiveMlAccounts } from './ml-accounts';
@@ -395,6 +395,7 @@ export async function refreshOrder(orderId: string) {
   const shippingDetails = freshData.shipping_details || null;
   const isFlex = freshData.is_flex === true || freshData.logistic_type === 'self_service';
   const isTurbo = freshData.is_turbo === true;
+  const isCollection = freshData.is_collection === true;
   const priorityMessage = formatPriorityMessage(
     freshData.logistic_type || '',
     isFlex,
@@ -416,6 +417,7 @@ export async function refreshOrder(orderId: string) {
       status: newStatus !== order.status ? newStatus : undefined,
       isFlex,
       isTurbo,
+      isCollection,
       priorityMessage,
       buyerName: freshData.buyer_name ?? undefined,
       shippingId: freshData.ml_shipping_id ?? undefined,
@@ -487,9 +489,9 @@ export async function refreshOrder(orderId: string) {
  * Usa un lock distribuido (Redis → Postgres EmergencyLock) para evitar
  * ejecuciones concurrentes entre procesos (autoSync + API).
  */
-export async function syncOrders(limit: number = 30, offset: number = 0): Promise<SyncResult> {
+export async function syncOrders(limit?: number, offset: number = 0): Promise<SyncResult> {
   // Lock distribuido: previene syncs concurrentes entre procesos
-  const LOCK_TTL = 300; // 5 minutos
+  const LOCK_TTL = 900; // 15 minutos: evita solapamientos durante una sincronización completa
   const lockAcquired = await RedisManager.lockOrder('sync_lock', 'global', LOCK_TTL);
   if (!lockAcquired) {
     console.log('[SyncLock] ⏳ Sync ya en ejecución en otro proceso, ignorando llamada concurrente');
@@ -506,7 +508,9 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
     const accountErrors: string[] = [];
     for (const account of accounts) {
       try {
-        shipments.push(...await fetchPendingOrders(limit, offset, account));
+        shipments.push(...(limit
+          ? await fetchPendingOrders(limit, offset, account)
+          : await fetchAllPendingOrders(account)));
       } catch (error: any) {
         const message = `${account.nickname}: ${error.message || 'error desconocido'}`;
         accountErrors.push(message);
@@ -552,6 +556,7 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
       const shippingDetails = shipment.shipping_details || null;
       const isFlex = shipment.is_flex === true || shipment.logistic_type === 'self_service';
       const isTurbo = shipment.is_turbo === true;
+      const isCollection = shipment.is_collection === true;
       const priorityMessage = formatPriorityMessage(
         shipment.logistic_type || '',
         isFlex,
@@ -581,10 +586,11 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
         const needsMlIdFix = existingOrder.mlId !== mlIdStr; // mlId viejo era shipping ID (2000...)
         const needsPriorityUpdate = existingOrder.priorityMessage !== priorityMessage;
         const needsTurboUpdate = (existingOrder as any).isTurbo !== isTurbo;
+        const needsCollectionUpdate = (existingOrder as any).isCollection !== isCollection;
         const localAccountId = localAccountIdByGatewayId.get(shipment.accountId);
         const needsAccountUpdate = Boolean(localAccountId && existingOrder.mlAccountId !== localAccountId);
 
-        if (needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate || needsAccountUpdate || needsTurboUpdate) {
+        if (needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate || needsAccountUpdate || needsTurboUpdate || needsCollectionUpdate) {
           await prisma.order.update({
             where: { id: existingOrder.id },
             data: {
@@ -594,6 +600,7 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
               shippingId: shipment.ml_shipping_id ?? undefined,
               isFlex: shipment.is_flex ?? undefined,
               isTurbo,
+              isCollection,
               buyerName: shipment.buyer_name ?? undefined,
               priorityMessage,
               mlAccountId: localAccountId,
@@ -672,6 +679,7 @@ export async function syncOrders(limit: number = 30, offset: number = 0): Promis
             status: newStatus,
             isFlex,
             isTurbo,
+            isCollection,
             priorityMessage,
             buyerName,
             mlAccountId: localAccountIdByGatewayId.get(shipment.accountId),

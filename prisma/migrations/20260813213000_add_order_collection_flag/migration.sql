@@ -1,0 +1,1 @@
+ALTER TABLE "Order" ADD COLUMN "isCollection" BOOLEAN NOT NULL DEFAULT false;

@@ -20,7 +20,7 @@ async function sync() {
   const timestamp = new Date().toLocaleTimeString();
   console.log(`[${timestamp}] 🔄 Iniciando Sincronización Gateway -> WMS...`);
   try {
-    const result = await syncOrders(30);
+    const result = await syncOrders();
     console.log(
       `[${timestamp}] ✅ Sync exitosa: ${result.imported} importadas, ` +
       `${result.resolutionRequired} pendientes de vincular, ` +

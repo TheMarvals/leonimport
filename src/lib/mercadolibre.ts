@@ -348,6 +348,25 @@ async function runWithConcurrency<T>(
   await Promise.all(results);
 }
 
+/** Mapea una lista en paralelo conservando el orden original. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  concurrency: number = 8,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await fn(items[index]);
+    }
+  }));
+
+  return results;
+}
+
 /**
  * Respuesta unificada de órdenes lista para que syncOrders las procese.
  * Coincide con el formato que antes devolvía el gateway.
@@ -366,6 +385,7 @@ export type MlShipmentOrder = {
   item_image: string | null;
   is_flex: boolean;
   is_turbo: boolean;
+  is_collection: boolean;
   logistic_type: string;
   shipping_details: object | null;
   buyer_name: string | null;
@@ -379,11 +399,17 @@ export type MlShipmentOrder = {
  * @param limit Máximo de órdenes a obtener (default 50)
  * @returns Array de órdenes en formato unificado para syncOrders
  */
-export async function fetchPendingOrders(
+type PendingOrdersPage = {
+  orders: MlShipmentOrder[];
+  rawCount: number;
+  total: number;
+};
+
+async function fetchPendingOrdersPage(
   limit: number = 50,
   offset: number = 0,
   account?: Pick<MlAccountConfig, 'gatewayAccountId' | 'sellerId'>,
-): Promise<MlShipmentOrder[]> {
+): Promise<PendingOrdersPage> {
   const gatewayAccountId = account?.gatewayAccountId || LEGACY_ACCOUNT_ID();
   const headers = await mlHeaders(gatewayAccountId);
   const sellerId = account?.sellerId || LEGACY_SELLER_ID();
@@ -392,8 +418,8 @@ export async function fetchPendingOrders(
   // El cache de categorías ML no necesita TTL porque ML no cambia sus categorías.
   // Al reiniciar el proceso, se recuperan de Redis.
 
-  // Buscar órdenes más recientes primero (sort=date_desc) para captar órdenes nuevas en cada sync
-  const searchUrl = `${ML_API_BASE}/orders/search?seller=${sellerId}&sort=date_desc&limit=${limit}&offset=${offset}`;
+  // Pedir únicamente ventas pagadas cuyo envío sigue listo para preparar.
+  const searchUrl = `${ML_API_BASE}/orders/search?seller=${sellerId}&order.status=paid&shipping.status=ready_to_ship&sort=date_desc&limit=${limit}&offset=${offset}`;
   
   const searchRes = await fetch(searchUrl, {
     headers,
@@ -408,9 +434,10 @@ export async function fetchPendingOrders(
 
   const searchData = await searchRes.json();
   const orders: MlOrder[] = searchData.results || [];
+  const total = Number(searchData.paging?.total || 0);
 
   if (orders.length === 0) {
-    return [];
+    return { orders: [], rawCount: 0, total };
   }
 
   // Recolectar todos los item IDs únicos para buscar imágenes y categorías en batch
@@ -437,9 +464,7 @@ export async function fetchPendingOrders(
   await runWithConcurrency([...uniqueCategoryIds], catId => fetchCategoryPath(catId, headers).then(() => {}), 5);
 
   // Para cada orden, obtener detalles de items (seller_sku) y shipping
-  const results: MlShipmentOrder[] = [];
-
-  for (const order of orders) {
+  const results = await mapWithConcurrency(orders, async (order): Promise<MlShipmentOrder> => {
     // Obtener detalle completo de la orden (incluye seller_sku)
     const orderDetailRes = await fetch(`${ML_API_BASE}/orders/${order.id}`, {
       headers,
@@ -489,6 +514,7 @@ export async function fetchPendingOrders(
     const logisticType = shipment?.logistic_type || order.shipping?.logistic_type || '';
     const isFlex = logisticType === 'self_service';
     const isTurbo = shipment?.tags?.some(tag => tag.toLowerCase() === 'turbo') ?? false;
+    const isCollection = logisticType === 'cross_docking' || logisticType === 'xd_drop_off';
 
     let shippingDetails: object | null = null;
     if (shipment?.shipping_details) {
@@ -502,7 +528,7 @@ export async function fetchPendingOrders(
       ? [order.buyer.first_name, order.buyer.last_name].filter(Boolean).join(' ') || order.buyer.nickname
       : null;
 
-    results.push({
+    return {
       accountId: gatewayAccountId,
       ml_shipment_id: `ml-order-${order.id}`,
       ml_shipment_external_id: shipment?.id ? Number(shipment.id) : order.id, // Shipping ID como clave del paquete físico
@@ -516,15 +542,20 @@ export async function fetchPendingOrders(
       item_image: firstItem.image,
       is_flex: isFlex,
       is_turbo: isTurbo,
+      is_collection: isCollection,
       logistic_type: logisticType,
       shipping_details: shippingDetails,
       buyer_name: buyerName,
       shipping_status: shipment?.status || order.shipping?.status || null,
       order_status: orderDetail.status || null,
-    });
-  }
+    };
+  }, 10);
 
-  // --- AGRUPAR órdenes que comparten el mismo envío ---
+  return { orders: results, rawCount: orders.length, total };
+}
+
+function groupOrdersByShipment(results: MlShipmentOrder[]): MlShipmentOrder[] {
+  // Agrupar globalmente: dos ventas del mismo paquete pueden caer en páginas distintas.
   // Un comprador puede hacer varias compras que se despachan en el mismo paquete.
   // El picker necesita ver TODOS los items juntos para armar la caja completa.
   const grouped = new Map<string, MlShipmentOrder>();
@@ -549,6 +580,43 @@ export async function fetchPendingOrders(
   }
 
   return [...grouped.values()];
+}
+
+function isActionablePendingOrder(order: MlShipmentOrder): boolean {
+  return Boolean(order.ml_shipping_id)
+    && order.shipping_status === 'ready_to_ship'
+    && order.order_status === 'paid'
+    && order.logistic_type !== 'fulfillment';
+}
+
+/** Obtiene una página, conservado para herramientas de diagnóstico puntuales. */
+export async function fetchPendingOrders(
+  limit: number = 50,
+  offset: number = 0,
+  account?: Pick<MlAccountConfig, 'gatewayAccountId' | 'sellerId'>,
+): Promise<MlShipmentOrder[]> {
+  const page = await fetchPendingOrdersPage(limit, offset, account);
+  return groupOrdersByShipment(page.orders.filter(isActionablePendingOrder));
+}
+
+/** Recorre todas las páginas ready_to_ship y devuelve paquetes agrupados. */
+export async function fetchAllPendingOrders(
+  account?: Pick<MlAccountConfig, 'gatewayAccountId' | 'sellerId'>,
+  pageSize: number = 50,
+): Promise<MlShipmentOrder[]> {
+  const allOrders: MlShipmentOrder[] = [];
+  let offset = 0;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (offset < total) {
+    const page = await fetchPendingOrdersPage(pageSize, offset, account);
+    allOrders.push(...page.orders);
+    total = page.total;
+    if (page.rawCount === 0) break;
+    offset += page.rawCount;
+  }
+
+  return groupOrdersByShipment(allOrders.filter(isActionablePendingOrder));
 }
 
 /**
@@ -632,6 +700,7 @@ export async function fetchSingleOrder(
   const logisticType = shipment?.logistic_type || orderDetail.shipping?.logistic_type || '';
   const isFlex = logisticType === 'self_service';
   const isTurbo = shipment?.tags?.some(tag => tag.toLowerCase() === 'turbo') ?? false;
+  const isCollection = logisticType === 'cross_docking' || logisticType === 'xd_drop_off';
 
   let shippingDetails: object | null = null;
   if (shipment?.shipping_details) {
@@ -658,6 +727,7 @@ export async function fetchSingleOrder(
     item_image: firstItem.image,
     is_flex: isFlex,
     is_turbo: isTurbo,
+    is_collection: isCollection,
     logistic_type: logisticType,
     shipping_details: shippingDetails,
     buyer_name: buyerName,

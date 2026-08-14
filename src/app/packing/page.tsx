@@ -34,6 +34,7 @@ interface Order {
   lockedBy?: string | null;
   isFlex: boolean;
   isTurbo: boolean;
+  isCollection: boolean;
   priorityMessage: string | null;
   buyerName: string | null;
   cubicle: { id: string; number: number } | null;
@@ -121,6 +122,7 @@ export default function PackingPage() {
           lockedBy: primary.lockedBy,
           isFlex: sortedGroup.some(o => o.isFlex),
           isTurbo: sortedGroup.some(o => o.isTurbo),
+          isCollection: sortedGroup.some(o => o.isCollection),
           priorityMessage: sortedGroup.find(o => o.priorityMessage)?.priorityMessage || primary.priorityMessage,
           buyerName: sortedGroup.map(o => o.buyerName).filter(Boolean).join(' / ') || primary.buyerName,
           cubicle: primary.cubicle,
@@ -556,10 +558,10 @@ export default function PackingPage() {
               })
               .map(o => (
               <div key={o.id} className={`bg-wms-surface border p-4 sm:p-6 rounded-2xl flex flex-col justify-between gap-5 sm:gap-6 hover:border-leon-red/50 transition-colors relative overflow-hidden ${o.isTurbo ? 'border-amber-400/70 bg-amber-500/10 ring-1 ring-amber-400/20' : o.isFlex ? 'border-leon-red/50 bg-leon-red/5' : 'border-wms-border'}`}>
-                {(o.isTurbo || o.isFlex) && (
+                {(o.isTurbo || o.isFlex || o.isCollection) && (
                    <div className="absolute top-0 right-0">
-                    <div className={`${o.isTurbo ? 'bg-amber-400 text-black' : 'bg-leon-red text-white'} text-[8px] font-black px-3 py-0.5 uppercase tracking-widest rounded-bl-lg shadow-lg`}>
-                      {o.isTurbo ? 'TURBO' : 'FLEX'}
+                    <div className={`${o.isTurbo ? 'bg-amber-400 text-black' : o.isFlex ? 'bg-leon-red text-white' : 'bg-sky-600 text-white'} text-[8px] font-black px-3 py-0.5 uppercase tracking-widest rounded-bl-lg shadow-lg`}>
+                      {o.isTurbo ? 'TURBO' : o.isFlex ? 'FLEX' : 'COLECTA'}
                     </div>
                   </div>
                 )}

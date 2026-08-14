@@ -3,7 +3,7 @@ import { syncOrders } from '@/lib/sync-orders';
 
 export async function POST() {
   try {
-    const result = await syncOrders(30);
+    const result = await syncOrders();
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Sync Error:', error);
