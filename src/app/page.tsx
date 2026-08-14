@@ -4,7 +4,6 @@ import {
   ScanLine, 
   LayoutDashboard, 
   Warehouse, 
-  Link2,
 } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { redirect } from 'next/navigation';
@@ -45,16 +44,8 @@ export default async function HomePage() {
       href: '/supervisor',
       icon: LayoutDashboard,
       title: 'SUPERVISOR',
-      desc: 'Control y resolución de conflictos',
+      desc: 'Operaciones, usuarios y cuentas ML',
       color: 'red-500',
-      roles: ['SUPERVISOR', 'ADMIN'],
-    },
-    {
-      href: '/admin?tab=ml-accounts',
-      icon: Link2,
-      title: 'CUENTAS ML',
-      desc: 'Vincular y desvincular cuentas',
-      color: 'sky-500',
       roles: ['SUPERVISOR', 'ADMIN'],
     },
   ];

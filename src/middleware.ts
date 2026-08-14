@@ -33,6 +33,28 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/', req.url));
   }
 
+  // La consola de supervisión reemplaza al antiguo panel administrativo.
+  // Conservamos estas rutas como accesos compatibles para marcadores viejos.
+  if (pathname === '/admin' && ['SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    const tabMap: Record<string, string> = {
+      users: 'users',
+      'ml-accounts': 'ml-accounts',
+      cubicles: 'cubicles',
+      duplicates: 'merge',
+      'ml-missing': 'ml-missing',
+    };
+    const destination = req.nextUrl.clone();
+    const requestedTab = destination.searchParams.get('tab') || 'ml-missing';
+    destination.pathname = '/supervisor';
+    destination.search = '';
+    destination.searchParams.set('tab', tabMap[requestedTab] || 'ml-missing');
+    return NextResponse.redirect(destination);
+  }
+
+  if (pathname === '/admin/sync' && ['SUPERVISOR', 'ADMIN'].includes(session.role)) {
+    return NextResponse.redirect(new URL('/supervisor/sync', req.url));
+  }
+
   if (pathname.startsWith('/supervisor') && !['SUPERVISOR', 'ADMIN'].includes(session.role)) {
     return NextResponse.redirect(new URL('/', req.url));
   }

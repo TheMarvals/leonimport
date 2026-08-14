@@ -200,7 +200,7 @@ export default function SyncDashboardPage() {
 
       <header className="mb-8 flex flex-col gap-5 md:mb-12 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-start gap-3 md:items-center md:gap-4">
-          <Link href="/admin" className="text-wms-muted hover:text-white transition-colors">
+          <Link href="/supervisor" className="text-wms-muted hover:text-white transition-colors">
             <ArrowLeft size={26} className="md:h-8 md:w-8" />
           </Link>
           <div>

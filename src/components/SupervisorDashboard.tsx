@@ -27,15 +27,17 @@ import {
   ChevronUp,
   ListFilter,
   UserRound,
-  TriangleAlert
+  TriangleAlert,
+  Link2,
 } from 'lucide-react';
 import { getHighResImageUrl } from '@/lib/image-utils';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
 import CubicleManager from '@/components/CubicleManager';
 import ProductMergeManager from '@/components/ProductMergeManager';
 import UserManager from '@/components/UserManager';
+import MlAccountManager from '@/components/MlAccountManager';
 
-type Tab = 'ml-missing' | 'conflicts' | 'history' | 'audit' | 'cubicles' | 'merge' | 'users';
+type Tab = 'ml-missing' | 'conflicts' | 'history' | 'audit' | 'cubicles' | 'merge' | 'users' | 'ml-accounts';
 
 interface ConflictItem {
   id: string;
@@ -58,6 +60,14 @@ interface GhostGroup {
 
 export const SupervisorDashboard = () => {
   const [activeTab, setActiveTab] = useState<Tab>('ml-missing');
+
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    const validTabs: Tab[] = ['ml-missing', 'conflicts', 'history', 'audit', 'cubicles', 'merge', 'users', 'ml-accounts'];
+    if (requestedTab && validTabs.includes(requestedTab as Tab)) {
+      setActiveTab(requestedTab as Tab);
+    }
+  }, []);
 
   // ─── Existing state ───
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
@@ -568,6 +578,18 @@ export const SupervisorDashboard = () => {
           }`}>
           <Users size={15} /> USUARIOS
         </button>
+        <button onClick={() => setActiveTab('ml-accounts')}
+          className={`justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'ml-accounts'
+              ? 'bg-sky-500/10 border border-sky-500/35 text-sky-400 font-black shadow-inner'
+              : 'text-wms-muted hover:text-white hover:bg-white/5 border border-transparent'
+          }`}>
+          <Link2 size={15} /> CUENTAS ML
+        </button>
+        <Link href="/supervisor/sync"
+          className="justify-center px-3 lg:px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all whitespace-nowrap shrink-0 text-wms-muted hover:text-white hover:bg-white/5 border border-transparent">
+          <Activity size={15} /> SYNC
+        </Link>
       </div>
 
       {activeTab === 'cubicles' && <CubicleManager />}
@@ -575,6 +597,8 @@ export const SupervisorDashboard = () => {
       {activeTab === 'merge' && <ProductMergeManager />}
 
       {activeTab === 'users' && <UserManager />}
+
+      {activeTab === 'ml-accounts' && <MlAccountManager />}
 
       {/* ═══════════════════════════════════ */}
       {/* TAB: ML-MISSING */}
