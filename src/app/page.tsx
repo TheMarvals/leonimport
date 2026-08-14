@@ -3,7 +3,10 @@ import {
   Package, 
   ScanLine, 
   LayoutDashboard, 
-  Warehouse, 
+  Warehouse,
+  ArrowUpRight,
+  CircleCheck,
+  Sparkles,
 } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { redirect } from 'next/navigation';
@@ -20,40 +23,57 @@ export default async function HomePage() {
       href: '/picking',
       icon: Package,
       title: 'PICKING',
-      desc: 'Recolección con ruta S-Shape',
-      color: 'leon-red',
+      desc: 'Recolecta productos y prepara los pedidos pendientes.',
+      eyebrow: 'Recolección',
+      accent: 'text-rose-400',
+      iconSurface: 'border-rose-500/20 bg-rose-500/10',
+      hover: 'hover:border-rose-500/45 hover:shadow-rose-950/25',
+      glow: 'bg-rose-500/10',
       roles: ['SUPERVISOR', 'ADMIN', 'PICKER', 'PACKER'],
     },
     {
       href: '/packing',
       icon: ScanLine,
       title: 'PACKING',
-      desc: '6 mesas de armado',
-      color: 'green-500',
+      desc: 'Valida, empaca e imprime las etiquetas de despacho.',
+      eyebrow: '6 mesas activas',
+      accent: 'text-emerald-400',
+      iconSurface: 'border-emerald-500/20 bg-emerald-500/10',
+      hover: 'hover:border-emerald-500/45 hover:shadow-emerald-950/25',
+      glow: 'bg-emerald-500/10',
       roles: ['SUPERVISOR', 'ADMIN', 'PICKER', 'PACKER'],
     },
     {
       href: '/inventario',
       icon: Warehouse,
       title: 'INVENTARIO',
-      desc: 'Productos, stock y ubicaciones',
-      color: 'amber-500',
+      desc: 'Gestiona stock, ubicaciones, SKU y proveedores.',
+      eyebrow: 'Bodega',
+      accent: 'text-amber-400',
+      iconSurface: 'border-amber-500/20 bg-amber-500/10',
+      hover: 'hover:border-amber-500/45 hover:shadow-amber-950/25',
+      glow: 'bg-amber-500/10',
       roles: ['SUPERVISOR', 'ADMIN', 'BODEGUERO'],
     },
     {
       href: '/supervisor',
       icon: LayoutDashboard,
       title: 'SUPERVISOR',
-      desc: 'Operaciones, usuarios y cuentas ML',
-      color: 'red-500',
+      desc: 'Controla la operación, usuarios, cuentas ML y auditoría.',
+      eyebrow: 'Administración',
+      accent: 'text-sky-400',
+      iconSurface: 'border-sky-500/20 bg-sky-500/10',
+      hover: 'hover:border-sky-500/45 hover:shadow-sky-950/25',
+      glow: 'bg-sky-500/10',
       roles: ['SUPERVISOR', 'ADMIN'],
     },
   ];
 
   const visibleModules = modules.filter((m) => m.roles.includes(session.role));
+  const firstName = session.name?.trim().split(/\s+/)[0] || 'equipo';
 
   return (
-    <div className="min-h-screen bg-wms-bg flex flex-col">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-wms-bg">
       <Navbar 
         title="LEÓN IMPORT" 
         subtitle="Gestión de Almacén" 
@@ -61,36 +81,79 @@ export default async function HomePage() {
         session={{ name: session.name || '', role: session.role }} 
       />
 
-      <div className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <div className="max-w-4xl w-full space-y-8 md:space-y-12">
-          <div className="text-center space-y-4">
-            <h1 className="whitespace-nowrap text-4xl font-black tracking-tighter text-white md:text-6xl">
-              LEÓN <span className="text-leon-red">IMPORT</span>
-            </h1>
-            <p className="text-xs uppercase tracking-[0.2em] text-wms-muted sm:text-sm sm:tracking-[0.3em]">
-              Sistema de Gestión de Almacén
-            </p>
-          </div>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 top-14">
+        <div className="absolute left-1/2 top-0 h-[28rem] w-[58rem] -translate-x-1/2 rounded-full bg-leon-red/10 blur-[130px]" />
+        <div className="absolute inset-0 opacity-[0.025] [background-image:linear-gradient(rgba(255,255,255,0.8)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.8)_1px,transparent_1px)] [background-size:36px_36px] [mask-image:linear-gradient(to_bottom,black,transparent_82%)]" />
+      </div>
 
-          <div className={`grid grid-cols-1 ${visibleModules.length <= 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4'} gap-4 md:gap-6`}>
-            {visibleModules.map((mod) => (
+      <main className="relative z-10 flex-1 px-4 py-7 sm:px-6 sm:py-9 lg:px-8 lg:py-12">
+        <div className="mx-auto flex h-full w-full max-w-7xl flex-col">
+          <section className="mb-7 flex flex-col gap-6 border-b border-white/[0.07] pb-7 sm:mb-9 sm:pb-9 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="mb-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-leon-red-light sm:text-xs">
+                <Sparkles size={14} /> Centro de operaciones
+              </div>
+              <h1 className="text-3xl font-black leading-[1.05] tracking-[-0.04em] text-white sm:text-4xl lg:text-5xl">
+                Hola, {firstName}. <span className="text-white/40">¿Qué vamos a preparar hoy?</span>
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-wms-muted sm:text-base">
+                Selecciona un módulo para comenzar. Cada área conserva tu sesión y mantiene la operación sincronizada.
+              </p>
+            </div>
+
+            <div className="flex w-fit items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3 shadow-lg shadow-black/10">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              </span>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-400">Sistema operativo</p>
+                <p className="mt-0.5 text-xs text-white/50">Servicios conectados</p>
+              </div>
+            </div>
+          </section>
+
+          <section aria-label="Módulos del WMS" className={`grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 ${visibleModules.length > 2 ? 'lg:grid-cols-4' : ''}`}>
+            {visibleModules.map((mod, index) => (
               <Link
                 key={mod.href}
                 href={mod.href}
-                className={`group bg-wms-card border border-wms-border hover:border-${mod.color}/50 p-5 md:p-8 rounded-2xl md:rounded-3xl transition-all duration-300 hover:shadow-lg hover:shadow-${mod.color}/10`}
+                className={`group relative flex min-h-[230px] overflow-hidden rounded-[1.4rem] border border-white/[0.09] bg-gradient-to-b from-[#1b1f29] to-[#151820] p-5 shadow-xl shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl sm:min-h-[250px] sm:p-6 ${mod.hover}`}
               >
-                <mod.icon size={36} className={`text-${mod.color} mb-4 md:mb-6 group-hover:scale-110 transition-transform md:w-12 md:h-12`} />
-                <h2 className="text-lg md:text-2xl font-bold mb-2">{mod.title}</h2>
-                <p className="text-wms-muted text-sm">{mod.desc}</p>
+                <div className={`absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100 ${mod.glow}`} />
+                <div className="relative flex w-full flex-col">
+                  <div className="flex items-start justify-between">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${mod.iconSurface} ${mod.accent}`}>
+                      <mod.icon size={25} strokeWidth={2.3} className="transition-transform duration-300 group-hover:scale-110" />
+                    </div>
+                    <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-white/20">0{index + 1}</span>
+                  </div>
+
+                  <div className="mt-7 flex-1">
+                    <p className={`mb-2 text-[10px] font-black uppercase tracking-[0.2em] ${mod.accent}`}>{mod.eyebrow}</p>
+                    <h2 className="text-xl font-black tracking-[-0.02em] text-white sm:text-2xl">{mod.title}</h2>
+                    <p className="mt-3 text-sm leading-5 text-white/45 transition-colors group-hover:text-white/60">{mod.desc}</p>
+                  </div>
+
+                  <div className="mt-7 flex items-center justify-between border-t border-white/[0.07] pt-4">
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">
+                      <CircleCheck size={13} className={mod.accent} /> Disponible
+                    </span>
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:border-white/20 ${mod.accent}`}>
+                      <ArrowUpRight size={16} />
+                    </span>
+                  </div>
+                </div>
               </Link>
             ))}
-          </div>
+          </section>
 
-          <p className="text-center text-wms-muted/30 text-xs">
-            WMS v{process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0'} · León Import — Tu Mejor Experiencia
-          </p>
+          <footer className="mt-7 flex flex-col items-center justify-between gap-2 border-t border-white/[0.05] pt-5 text-[10px] uppercase tracking-[0.16em] text-white/20 sm:flex-row">
+            <p>León Import · Warehouse Management System</p>
+            <p>Versión {process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0'}</p>
+          </footer>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
