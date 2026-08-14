@@ -350,8 +350,13 @@ export const SupervisorDashboard = () => {
   const filteredAuditLogs = auditLogs.filter((log: any) => {
     const search = auditSearchTerm.trim().toLowerCase();
     const matchesAction = auditActionFilter === 'ALL' || log.action === auditActionFilter;
+    const mlOrderId = String(log.order?.mlOrderId || log.order?.mlId || '');
+    const account = log.order?.mlAccount;
     const matchesSearch = !search ||
       log.userId?.toLowerCase().includes(search) ||
+      mlOrderId.toLowerCase().includes(search) ||
+      account?.nickname?.toLowerCase().includes(search) ||
+      account?.sellerId?.toLowerCase().includes(search) ||
       getActionLabel(log.action).toLowerCase().includes(search) ||
       formatMetadata(log).toLowerCase().includes(search);
     return matchesAction && matchesSearch;
@@ -1162,7 +1167,7 @@ export const SupervisorDashboard = () => {
             <div className="grid gap-3 border-b border-white/5 p-4 sm:grid-cols-[1fr_16rem]">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-wms-muted" size={18} />
-                <input value={auditSearchTerm} onChange={event => setAuditSearchTerm(event.target.value)} placeholder="Buscar por operario, acción o detalle..." className="min-h-12 w-full rounded-xl border border-wms-border bg-black/25 pl-11 pr-4 text-sm text-white outline-none transition-colors placeholder:text-white/20 focus:border-purple-500/60" />
+                <input value={auditSearchTerm} onChange={event => setAuditSearchTerm(event.target.value)} placeholder="Buscar por orden ML, cuenta, operario o acción..." className="min-h-12 w-full rounded-xl border border-wms-border bg-black/25 pl-11 pr-4 text-sm text-white outline-none transition-colors placeholder:text-white/20 focus:border-purple-500/60" />
               </div>
               <div className="relative">
                 <ListFilter className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-wms-muted" size={17} />
@@ -1179,6 +1184,8 @@ export const SupervisorDashboard = () => {
                 {filteredAuditLogs.map((log: any) => {
                   const metadata = metadataOf(log);
                   const isExpanded = expandedAuditId === log.id;
+                  const mlOrderId = log.order?.mlOrderId || log.order?.mlId;
+                  const mlAccount = log.order?.mlAccount;
                   return (
                     <article key={log.id} className="group overflow-hidden rounded-2xl border border-white/[0.07] bg-black/20 transition-all hover:border-purple-500/25 hover:bg-purple-500/[0.035]">
                       <button type="button" onClick={() => setExpandedAuditId(isExpanded ? null : log.id)} className="grid w-full gap-4 p-4 text-left sm:grid-cols-[10rem_12rem_1fr_auto] sm:items-center sm:p-5">
@@ -1188,7 +1195,11 @@ export const SupervisorDashboard = () => {
                         </div>
                         <div className="flex min-w-0 items-center gap-2"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/5 text-wms-muted"><UserRound size={14} /></div><span className="truncate font-mono text-xs font-bold text-white/85">{log.userId}</span></div>
                         <div className="min-w-0">
-                          <span className={`inline-flex rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${getActionStyle(log.action)}`}>{getActionLabel(log.action)}</span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={`inline-flex rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${getActionStyle(log.action)}`}>{getActionLabel(log.action)}</span>
+                            {mlOrderId && <span className="inline-flex rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 font-mono text-[9px] font-black text-sky-300">ML #{mlOrderId}</span>}
+                            {mlAccount && <span className="inline-flex rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-300">{mlAccount.nickname}</span>}
+                          </div>
                           <p className="mt-2 text-xs leading-5 text-white/65 sm:text-sm">{formatMetadata(log)}</p>
                         </div>
                         <div className="flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-widest text-wms-muted sm:justify-end"><span className="sm:hidden">Detalle técnico</span>{isExpanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}</div>
@@ -1196,6 +1207,19 @@ export const SupervisorDashboard = () => {
 
                       {isExpanded && (
                         <div className="border-t border-white/5 bg-black/25 px-4 py-4 sm:ml-[22rem] sm:px-5">
+                          {mlOrderId && (
+                            <div className="mb-4 grid gap-2 md:grid-cols-2">
+                              <div className="rounded-xl border border-sky-500/15 bg-sky-500/[0.05] p-3">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-sky-300/70">Orden Mercado Libre</p>
+                                <p className="mt-1 font-mono text-xs font-bold text-sky-200">{mlOrderId}</p>
+                              </div>
+                              <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.05] p-3">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-emerald-300/70">Cuenta Mercado Libre</p>
+                                <p className="mt-1 text-xs font-bold text-emerald-200">{mlAccount?.nickname || 'Cuenta histórica no identificada'}</p>
+                                {mlAccount?.sellerId && <p className="mt-1 font-mono text-[9px] text-white/40">Seller ID: {mlAccount.sellerId}</p>}
+                              </div>
+                            </div>
+                          )}
                           <p className="mb-3 text-[9px] font-black uppercase tracking-[0.2em] text-wms-muted">Datos del evento</p>
                           {Object.keys(metadata).length ? (
                             <div className="grid gap-2 md:grid-cols-2">

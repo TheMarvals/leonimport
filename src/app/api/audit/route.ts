@@ -14,8 +14,29 @@ export async function GET(req: NextRequest) {
     const logs = await prisma.auditLog.findMany({
       orderBy: { timestamp: 'desc' },
       take: 100,
+      include: {
+        order: {
+          select: {
+            mlId: true,
+            mlOrderId: true,
+            mlAccount: {
+              select: {
+                nickname: true,
+                sellerId: true,
+                gatewayAccountId: true,
+              },
+            },
+          },
+        },
+      },
     });
-    return NextResponse.json(logs);
+    return NextResponse.json(logs.map(log => ({
+      ...log,
+      order: log.order ? {
+        ...log.order,
+        mlOrderId: log.order.mlOrderId?.toString() || log.order.mlId,
+      } : null,
+    })));
   } catch (error) {
     console.error('Failed to fetch audit logs:', error);
     return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
