@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { fetchLabel, extractFirstPage } from '@/lib/label-service';
-import { isPrintNodeConfigured, printPdfWithPrintNode } from '@/lib/printnode';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -10,11 +10,20 @@ export async function POST(req: NextRequest) {
   try {
     const { mlId, station } = await req.json();
     if (!mlId) return NextResponse.json({ error: 'Falta mlId' }, { status: 400 });
-    if (!isPrintNodeConfigured()) {
+    if (!station) {
+      return NextResponse.json({ fallback: true, code: 'STATION_REQUIRED', error: 'La orden no tiene una mesa asignada.' }, { status: 503 });
+    }
+
+    const printer = await prisma.printerConfig.findFirst({
+      where: { purpose: 'PACKING', stationName: String(station), isActive: true },
+      orderBy: { updatedAt: 'desc' },
+      select: { printerName: true },
+    });
+    if (!printer) {
       return NextResponse.json({
         fallback: true,
-        code: 'PRINTNODE_NOT_CONFIGURED',
-        error: 'PrintNode aún no está configurado; usa la impresión manual.',
+        code: 'PRINTER_NOT_ASSIGNED',
+        error: `No hay una impresora asignada a ${station}; usa la impresión manual.`,
       }, { status: 503 });
     }
 
@@ -31,14 +40,14 @@ export async function POST(req: NextRequest) {
 
     console.log(`[PrintRoute] Etiqueta obtenida desde ${sourceLabel} para ${mlId}`);
 
-    const result = await printPdfWithPrintNode({
-      purpose: 'PACKING',
-      stationName: station,
-      pdf: singlePage,
-      title: `Etiqueta ML-${mlId}`,
+    return NextResponse.json({
+      ready: true,
+      provider: 'qz',
+      printerName: printer.printerName,
+      pdfBase64: Buffer.from(singlePage).toString('base64'),
+      jobName: `Etiqueta ML-${mlId}`,
+      source: sourceLabel,
     });
-    if (!result.printed) return NextResponse.json({ ...result, source: sourceLabel }, { status: 503 });
-    return NextResponse.json({ success: true, ...result, source: sourceLabel });
 
   } catch (error: any) {
     console.error('[PrintRoute] Error:', error);

@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
 import { getHighResImageUrl } from '@/lib/image-utils';
+import { printPdfWithQz } from '@/lib/qz-print';
 
 interface Supplier {
   id: string;
@@ -329,7 +330,7 @@ export default function InventarioPage() {
   const sendSkuLabelsToPrinter = async (ids: string[], counts: string[]) => {
     const manualUrl = `/api/labels?ids=${ids.join(',')}&counts=${counts.join(',')}&size=${labelSize}`;
     // La pestaña se abre dentro del clic para que el navegador no bloquee el
-    // fallback mientras esperamos la respuesta de PrintNode.
+    // fallback mientras esperamos la respuesta del QZ Tray local.
     const printTab = window.open('about:blank', '_blank');
     if (printTab) {
       printTab.document.title = 'Preparando etiquetas SKU...';
@@ -343,6 +344,8 @@ export default function InventarioPage() {
         body: JSON.stringify({ ids, counts, size: labelSize }),
       });
       if (response.ok) {
+        const printJob = await response.json();
+        await printPdfWithQz(printJob);
         printTab?.close();
         showToast('Etiquetas enviadas a la impresora de bodega.', 'success');
         return;
@@ -350,13 +353,13 @@ export default function InventarioPage() {
 
       if (printTab && !printTab.closed) {
         printTab.location.href = manualUrl;
-        showToast('PrintNode no está disponible. Etiquetas abiertas para impresión manual.', 'info');
+        showToast('QZ Tray no está disponible. Etiquetas abiertas para impresión manual.', 'info');
       } else {
         await showModalAlert('Impresión manual requerida', 'Habilita las ventanas emergentes y vuelve a imprimir.', 'warning');
       }
     } catch {
       if (printTab && !printTab.closed) printTab.location.href = manualUrl;
-      else await showModalAlert('Impresión manual requerida', 'No se pudo conectar con PrintNode y el navegador bloqueó la pestaña.', 'warning');
+      else await showModalAlert('Impresión manual requerida', 'No se pudo conectar con QZ Tray y el navegador bloqueó la pestaña.', 'warning');
     }
   };
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
-import { isPrintNodeConfigured, listPrintNodePrinters } from '@/lib/printnode';
 
 const ALLOWED_STATIONS = ['Mesa 1', 'Mesa 2', 'Mesa 3', 'Mesa 4', 'Mesa 5', 'Mesa 6'];
 
@@ -18,21 +17,7 @@ export async function GET() {
     orderBy: [{ purpose: 'asc' }, { stationName: 'asc' }],
   });
 
-  if (!isPrintNodeConfigured()) {
-    return NextResponse.json({ configured: false, configs, printers: [] });
-  }
-
-  try {
-    const printers = await listPrintNodePrinters();
-    return NextResponse.json({ configured: true, configs, printers });
-  } catch (error: any) {
-    return NextResponse.json({
-      configured: true,
-      configs,
-      printers: [],
-      warning: error.message || 'No se pudo consultar PrintNode',
-    });
-  }
+  return NextResponse.json({ configs });
 }
 
 export async function POST(req: NextRequest) {
@@ -40,13 +25,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const printNodeId = Number(body.printNodeId);
+    const id = body.id ? String(body.id) : null;
+    const printerName = String(body.printerName || '').trim();
     const purpose = String(body.purpose || '');
     const stationName = purpose === 'PACKING' ? String(body.stationName || '') : null;
-    const name = String(body.name || '').trim();
+    const name = String(body.name || printerName).trim();
 
-    if (!Number.isInteger(printNodeId) || printNodeId <= 0 || !name) {
-      return NextResponse.json({ error: 'Impresora PrintNode inválida' }, { status: 400 });
+    if (!printerName || !name) {
+      return NextResponse.json({ error: 'Selecciona una impresora QZ válida' }, { status: 400 });
     }
     if (!['PACKING', 'SKU'].includes(purpose)) {
       return NextResponse.json({ error: 'Tipo de impresora inválido' }, { status: 400 });
@@ -55,7 +41,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Selecciona una mesa válida' }, { status: 400 });
     }
 
-    const current = await prisma.printerConfig.findUnique({ where: { printNodeId } });
+    const current = id
+      ? await prisma.printerConfig.findUnique({ where: { id } })
+      : await prisma.printerConfig.findFirst({ where: { printerName, purpose: purpose as any, stationName } });
     const conflicting = await prisma.printerConfig.findMany({
       where: {
         isActive: true,
@@ -73,10 +61,14 @@ export async function POST(req: NextRequest) {
           data: { isActive: false },
         });
       }
-      return transaction.printerConfig.upsert({
-        where: { printNodeId },
-        update: { name, purpose: purpose as any, stationName, labelSize: body.labelSize || null, isActive: true },
-        create: { printNodeId, name, purpose: purpose as any, stationName, labelSize: body.labelSize || null },
+      if (current) {
+        return transaction.printerConfig.update({
+          where: { id: current.id },
+          data: { printerName, name, purpose: purpose as any, stationName, labelSize: body.labelSize || null, isActive: true },
+        });
+      }
+      return transaction.printerConfig.create({
+        data: { printerName, name, purpose: purpose as any, stationName, labelSize: body.labelSize || null },
       });
     });
 

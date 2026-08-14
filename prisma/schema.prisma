@@ -228,12 +228,12 @@ model SyncLog {
   createdAt          DateTime    @default(now())
 }
 
-/// Impresora física publicada por PrintNode. La asignación vive en el WMS,
-/// mientras la API key permanece únicamente en el entorno del servidor.
+/// Impresora local publicada por QZ Tray. La asignación vive en el WMS y cada
+/// navegador envía el trabajo a la impresora instalada en su propia estación.
 model PrinterConfig {
   id          String         @id @default(uuid())
   name        String
-  printNodeId Int            @unique
+  printerName String
   purpose     PrinterPurpose
   stationName String?
   labelSize   String?

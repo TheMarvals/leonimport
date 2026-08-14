@@ -11,6 +11,10 @@ const LABEL_SIZES = {
   large: { width: 100, height: 50 },
 } as const;
 
+export function getSkuLabelDimensions(size: string): { width: number; height: number } {
+  return LABEL_SIZES[size as keyof typeof LABEL_SIZES] || LABEL_SIZES.medium;
+}
+
 function safeText(value: string): string {
   return value.normalize('NFKD').replace(/[^\x20-\x7E]/g, '').trim();
 }
@@ -21,7 +25,7 @@ function fitText(text: string, maxChars: number): string {
 }
 
 export async function generateSkuLabelsPdf(products: SkuLabelProduct[], size: string): Promise<Uint8Array> {
-  const dimensions = LABEL_SIZES[size as keyof typeof LABEL_SIZES] || LABEL_SIZES.medium;
+  const dimensions = getSkuLabelDimensions(size);
   const width = dimensions.width * MM_TO_PT;
   const height = dimensions.height * MM_TO_PT;
   const pdf = await PDFDocument.create();

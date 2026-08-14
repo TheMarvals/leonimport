@@ -9,6 +9,7 @@ import { showToast, showConfirmModal, showModalAlert } from '@/lib/toast';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { usePhysicalScanner } from '@/hooks/usePhysicalScanner';
 import Navbar from '@/components/Navbar';
+import { printPdfWithQz } from '@/lib/qz-print';
 
 interface Product {
   id: string;
@@ -361,7 +362,8 @@ export default function PackingPage() {
         });
 
         if (printRes.ok) {
-          // Impresión directa exitosa — cerrar la pestaña temporal de fallback
+          const printJob = await printRes.json();
+          await printPdfWithQz(printJob);
           if (printTab && !printTab.closed) {
             printTab.close();
           }

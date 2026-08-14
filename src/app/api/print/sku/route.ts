@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
-import { generateSkuLabelsPdf } from '@/lib/sku-label-pdf';
-import { isPrintNodeConfigured, printPdfWithPrintNode } from '@/lib/printnode';
+import { generateSkuLabelsPdf, getSkuLabelDimensions } from '@/lib/sku-label-pdf';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -15,9 +14,12 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200) {
       return NextResponse.json({ error: 'Selecciona entre 1 y 200 productos' }, { status: 400 });
     }
-    if (!isPrintNodeConfigured()) {
-      return NextResponse.json({ fallback: true, code: 'PRINTNODE_NOT_CONFIGURED' }, { status: 503 });
-    }
+    const skuPrinter = await prisma.printerConfig.findFirst({
+      where: { purpose: 'SKU', isActive: true },
+      orderBy: { updatedAt: 'desc' },
+      select: { printerName: true, labelSize: true },
+    });
+    if (!skuPrinter) return NextResponse.json({ fallback: true, code: 'PRINTER_NOT_ASSIGNED' }, { status: 503 });
 
     const products = await prisma.product.findMany({
       where: { id: { in: ids.map(String) } },
@@ -32,19 +34,16 @@ export async function POST(req: NextRequest) {
     });
     if (labels.length > 500) return NextResponse.json({ error: 'Máximo 500 etiquetas por trabajo' }, { status: 400 });
 
-    const skuPrinter = await prisma.printerConfig.findFirst({
-      where: { purpose: 'SKU', isActive: true },
-      orderBy: { updatedAt: 'desc' },
-      select: { labelSize: true },
+    const selectedSize = skuPrinter.labelSize || String(size);
+    const pdf = await generateSkuLabelsPdf(labels, selectedSize);
+    return NextResponse.json({
+      ready: true,
+      provider: 'qz',
+      printerName: skuPrinter.printerName,
+      pdfBase64: Buffer.from(pdf).toString('base64'),
+      jobName: `Etiquetas SKU (${labels.length})`,
+      size: getSkuLabelDimensions(selectedSize),
     });
-    const pdf = await generateSkuLabelsPdf(labels, skuPrinter?.labelSize || String(size));
-    const result = await printPdfWithPrintNode({
-      purpose: 'SKU',
-      pdf,
-      title: `Etiquetas SKU (${labels.length})`,
-    });
-    if (!result.printed) return NextResponse.json(result, { status: 503 });
-    return NextResponse.json(result);
   } catch (error: any) {
     console.error('[SKU Print] Error:', error);
     return NextResponse.json({ fallback: true, error: error.message || 'No se pudo imprimir' }, { status: 500 });

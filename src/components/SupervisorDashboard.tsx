@@ -37,6 +37,7 @@ import ProductMergeManager from '@/components/ProductMergeManager';
 import UserManager from '@/components/UserManager';
 import MlAccountManager from '@/components/MlAccountManager';
 import PrinterManager from '@/components/PrinterManager';
+import { printPdfWithQz } from '@/lib/qz-print';
 
 type Tab = 'ml-missing' | 'conflicts' | 'history' | 'audit' | 'cubicles' | 'merge' | 'users' | 'ml-accounts' | 'printers';
 
@@ -880,6 +881,7 @@ export const SupervisorDashboard = () => {
                             onClick={async (e) => {
                               e.stopPropagation();
                               setIsPrinting(true);
+                              const printTab = window.open(`/api/packing/label/${o.mlId}`, '_blank');
                               try {
                                 const printRes = await fetch('/api/print', {
                                   method: 'POST',
@@ -887,20 +889,20 @@ export const SupervisorDashboard = () => {
                                   body: JSON.stringify({ mlId: o.mlId, station: o.packingStation })
                                 });
                                 if (printRes.ok) {
-                                  setIsPrinting(false);
+                                  const printJob = await printRes.json();
+                                  await printPdfWithQz(printJob);
+                                  printTab?.close();
                                 } else {
-                                  const tab = window.open(`/api/packing/label/${o.mlId}`, '_blank');
-                                  if (!tab || tab.closed) {
+                                  if (!printTab || printTab.closed) {
                                     await showModalAlert('Impresión manual', 'Permite ventanas emergentes para ver la etiqueta.', 'warning');
                                   }
-                                  setIsPrinting(false);
                                 }
                               } catch (err) {
                                 console.error('Error en reimpresión:', err);
-                                const tab = window.open(`/api/packing/label/${o.mlId}`, '_blank');
-                                if (!tab || tab.closed) {
+                                if (!printTab || printTab.closed) {
                                   await showModalAlert('Impresión manual', 'Permite ventanas emergentes para ver la etiqueta.', 'warning');
                                 }
+                              } finally {
                                 setIsPrinting(false);
                               }
                             }}
@@ -1048,16 +1050,17 @@ export const SupervisorDashboard = () => {
                                       body: JSON.stringify({ mlId: o.mlId, station: o.packingStation })
                                     });
                                     if (printRes.ok) {
+                                      const printJob = await printRes.json();
+                                      await printPdfWithQz(printJob);
                                       if (printTab && !printTab.closed) {
                                         printTab.close();
                                       }
-                                      setIsPrinting(false);
                                     } else {
                                       console.warn('[Supervisor] Reimpresión directa falló, usando pestaña de fallback.');
-                                      setIsPrinting(false);
                                     }
                                   } catch (err) {
                                     console.error('Error en reimpresión:', err);
+                                  } finally {
                                     setIsPrinting(false);
                                   }
                                 }}
