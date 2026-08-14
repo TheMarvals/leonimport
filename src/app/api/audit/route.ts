@@ -36,9 +36,26 @@ export async function GET(req: NextRequest) {
       select: { id: true, name: true, role: true },
     });
     const usersById = new Map(users.map(user => [user.id, user]));
+    const sellerIds = [...new Set(logs.flatMap(log => {
+      const metadata = log.metadata && typeof log.metadata === 'object' && !Array.isArray(log.metadata)
+        ? log.metadata as Record<string, unknown>
+        : null;
+      return metadata?.sellerId ? [String(metadata.sellerId)] : [];
+    }))];
+    const mlAccounts = await prisma.mercadoLibreAccount.findMany({
+      where: { sellerId: { in: sellerIds } },
+      select: { alias: true, nickname: true, sellerId: true, gatewayAccountId: true },
+    });
+    const mlAccountsBySeller = new Map(mlAccounts.map(account => [account.sellerId, account]));
     return NextResponse.json(logs.map(log => ({
       ...log,
       user: usersById.get(log.userId) || null,
+      mlAccount: (() => {
+        const metadata = log.metadata && typeof log.metadata === 'object' && !Array.isArray(log.metadata)
+          ? log.metadata as Record<string, unknown>
+          : null;
+        return metadata?.sellerId ? mlAccountsBySeller.get(String(metadata.sellerId)) || null : null;
+      })(),
       order: log.order ? {
         ...log.order,
         mlOrderId: log.order.mlOrderId?.toString() || log.order.mlId,

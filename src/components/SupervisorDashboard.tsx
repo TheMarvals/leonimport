@@ -346,7 +346,8 @@ export const SupervisorDashboard = () => {
       return `${m.sourceSku || 'Producto duplicado'} fue fusionado dentro de ${m.targetSku || 'producto principal'}.`;
     }
     if (log.action === 'UPDATE_ML_ACCOUNT_ALIAS') {
-      return `${m.nickname || `Seller ${m.sellerId || 'ML'}`}: ${m.previousAlias || 'sin alias'} → ${m.newAlias || 'sin alias'}.`;
+      const accountName = log.mlAccount?.nickname || m.nickname || `Seller ${m.sellerId || 'ML'}`;
+      return `${accountName}: ${m.previousAlias || 'Sin alias'} → ${m.newAlias || 'Sin alias'}.`;
     }
     const values = Object.values(m).filter(value => value !== null && value !== undefined);
     return values.length ? 'Evento registrado correctamente. Abre el detalle para consultar sus datos.' : 'Evento registrado sin datos adicionales.';
@@ -365,7 +366,7 @@ export const SupervisorDashboard = () => {
       (auditQuickFilter === 'OPERATORS' && Boolean(log.user)) ||
       (auditQuickFilter === 'ALERTS' && isAuditIncident(log));
     const mlOrderId = String(log.order?.mlOrderId || log.order?.mlId || '');
-    const account = log.order?.mlAccount;
+    const account = log.order?.mlAccount || log.mlAccount;
     const matchesSearch = !search ||
       log.userId?.toLowerCase().includes(search) ||
       log.user?.name?.toLowerCase().includes(search) ||
@@ -1216,7 +1217,15 @@ export const SupervisorDashboard = () => {
                   const metadata = metadataOf(log);
                   const isExpanded = expandedAuditId === log.id;
                   const mlOrderId = log.order?.mlOrderId || log.order?.mlId;
-                  const mlAccount = log.order?.mlAccount;
+                  const mlAccount = log.order?.mlAccount || log.mlAccount;
+                  const auditDetails = log.action === 'UPDATE_ML_ACCOUNT_ALIAS'
+                    ? [
+                        ['Cuenta Mercado Libre', mlAccount?.nickname || metadata.nickname || 'Cuenta no identificada'],
+                        ['Alias anterior', metadata.previousAlias || 'Sin alias'],
+                        ['Alias nuevo', metadata.newAlias || 'Sin alias'],
+                        ['Seller ID', mlAccount?.sellerId || metadata.sellerId || 'No disponible'],
+                      ]
+                    : Object.entries(metadata).filter(([, value]) => value !== null && value !== undefined);
                   return (
                     <article key={log.id} className="group overflow-hidden rounded-2xl border border-white/[0.07] bg-black/20 transition-all hover:border-purple-500/25 hover:bg-purple-500/[0.035]">
                       <button type="button" onClick={() => setExpandedAuditId(isExpanded ? null : log.id)} className="grid w-full gap-4 p-4 text-left sm:grid-cols-[10rem_12rem_1fr_auto] sm:items-center sm:p-5">
@@ -1233,7 +1242,7 @@ export const SupervisorDashboard = () => {
                           </div>
                           <p className="mt-2 text-xs leading-5 text-white/65 sm:text-sm">{formatMetadata(log)}</p>
                         </div>
-                        <div className="flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-widest text-wms-muted sm:justify-end"><span className="sm:hidden">Detalle técnico</span>{isExpanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}</div>
+                        <div className="flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-widest text-wms-muted sm:justify-end"><span className="sm:hidden">Ver detalle</span>{isExpanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}</div>
                       </button>
 
                       {isExpanded && (
@@ -1253,11 +1262,11 @@ export const SupervisorDashboard = () => {
                             </div>
                           )}
                           <p className="mb-3 text-[9px] font-black uppercase tracking-[0.2em] text-wms-muted">Datos del evento</p>
-                          {Object.keys(metadata).length ? (
+                          {auditDetails.length ? (
                             <div className="grid gap-2 md:grid-cols-2">
-                              {Object.entries(metadata).map(([key, value]) => (
-                                <div key={key} className="min-w-0 rounded-xl border border-white/5 bg-white/[0.025] p-3">
-                                  <p className="text-[8px] font-black uppercase tracking-widest text-purple-300/70">{key.replace(/([A-Z])/g, ' $1').replaceAll('_', ' ')}</p>
+                              {auditDetails.map(([key, value]) => (
+                                <div key={String(key)} className="min-w-0 rounded-xl border border-white/5 bg-white/[0.025] p-3">
+                                  <p className="text-[8px] font-black uppercase tracking-widest text-purple-300/70">{String(key).replace(/([A-Z])/g, ' $1').replaceAll('_', ' ')}</p>
                                   <p className="mt-1 break-all font-mono text-[10px] leading-5 text-white/70">{Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value)}</p>
                                 </div>
                               ))}
