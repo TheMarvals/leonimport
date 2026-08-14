@@ -506,11 +506,13 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
     const accounts = await getActiveMlAccounts();
     const shipments = [] as Awaited<ReturnType<typeof fetchPendingOrders>>;
     const accountErrors: string[] = [];
+    const successfullySyncedAccountIds = new Set<string>();
     for (const account of accounts) {
       try {
         shipments.push(...(limit
           ? await fetchPendingOrders(limit, offset, account)
           : await fetchAllPendingOrders(account)));
+        successfullySyncedAccountIds.add(account.gatewayAccountId);
       } catch (error: any) {
         const message = `${account.nickname}: ${error.message || 'error desconocido'}`;
         accountErrors.push(message);
@@ -758,6 +760,45 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
          } catch(e) {
              console.warn(`[Sync] Fallo auditoría de orden ${order.id}:`, e);
          }
+      }
+    }
+
+    // En una sincronización completa, la cola local debe ser el espejo de los
+    // paquetes que ML todavía expone como paid + ready_to_ship. Solo retiramos
+    // órdenes que nadie ha empezado a trabajar (PENDING); picking/packing se
+    // conservan y siguen pasando por la auditoría individual de abajo.
+    if (limit === undefined) {
+      for (const account of accounts) {
+        if (!successfullySyncedAccountIds.has(account.gatewayAccountId)) continue;
+
+        const actionableShippingIds = shipments
+          .filter(shipment => shipment.accountId === account.gatewayAccountId)
+          .map(shipment => shipment.ml_shipping_id)
+          .filter((shippingId): shippingId is string => Boolean(shippingId));
+
+        const staleOrders = await prisma.order.findMany({
+          where: {
+            status: 'PENDING',
+            mlAccountId: account.id,
+            OR: [
+              { shippingId: null },
+              { shippingId: { notIn: actionableShippingIds } },
+            ],
+          },
+          select: { id: true, shippingId: true },
+        });
+
+        if (staleOrders.length > 0) {
+          const staleOrderIds = staleOrders.map(order => order.id);
+          await prisma.$transaction([
+            prisma.auditLog.deleteMany({ where: { orderId: { in: staleOrderIds } } }),
+            prisma.orderItem.deleteMany({ where: { orderId: { in: staleOrderIds } } }),
+            prisma.order.deleteMany({ where: { id: { in: staleOrderIds } } }),
+          ]);
+          console.log(
+            `[Sync] 🧹 ${staleOrders.length} órdenes fuera de ready_to_ship retiradas de la cola (${account.nickname})`,
+          );
+        }
       }
     }
 

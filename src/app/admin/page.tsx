@@ -43,6 +43,16 @@ type GhostGroup = {
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('users');
+
+  // Permite accesos directos desde el dashboard, por ejemplo
+  // /admin?tab=ml-accounts, manteniendo el resto del panel como pestañas.
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    const validTabs: Tab[] = ['users', 'ml-accounts', 'cubicles', 'duplicates', 'ml-missing'];
+    if (requestedTab && validTabs.includes(requestedTab as Tab)) {
+      setTab(requestedTab as Tab);
+    }
+  }, []);
   
   // ─── User state ───
   const [editingUser, setEditingUser] = useState<any>(null);

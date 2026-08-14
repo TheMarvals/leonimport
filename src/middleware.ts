@@ -29,7 +29,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Proteger rutas por rol
-  if (pathname.startsWith('/admin') && session.role !== 'ADMIN') {
+  if (pathname.startsWith('/admin') && !['SUPERVISOR', 'ADMIN'].includes(session.role)) {
     return NextResponse.redirect(new URL('/', req.url));
   }
 

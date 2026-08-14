@@ -10,7 +10,7 @@ const gatewayAppId = () => process.env.ML_GATEWAY_APP_ID || 'leon-express';
 
 async function getAdminSession() {
   const session = await getSession();
-  return session.isLoggedIn && session.role === 'ADMIN' ? session : null;
+  return session.isLoggedIn && ['SUPERVISOR', 'ADMIN'].includes(session.role) ? session : null;
 }
 
 const gatewayHeaders = () => ({
