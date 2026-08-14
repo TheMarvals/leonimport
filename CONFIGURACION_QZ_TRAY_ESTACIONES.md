@@ -165,6 +165,16 @@ El certificado de firma del WMS vence el 13 de agosto de 2029. Debe programarse 
 
 Los valores ya preparados en el `.env` local usan el prefijo `base64:`. Base64 evita problemas con saltos de línea, pero no cifra ni protege la clave. Para producción hay que copiar las mismas variables al `.env` real del servidor o a su gestor de secretos y reiniciar el servicio WMS.
 
+En el despliegue actual por Coolify:
+
+1. Abrir el servicio del WMS en Coolify.
+2. Entrar a **Environment Variables**.
+3. Copiar desde el `.env` local los valores completos de `QZ_CERTIFICATE` y `QZ_PRIVATE_KEY`, incluido el prefijo `base64:`.
+4. Confirmar que `SESSION_SECRET` tenga al menos 32 caracteres; esta variable es independiente de los certificados QZ.
+5. Guardar las variables y desplegar nuevamente el servicio.
+
+No pegar comillas adicionales alrededor de los valores si la interfaz de Coolify ya administra el valor como un campo de texto.
+
 ### Instalar la raíz pública en una estación
 
 1. Copiar únicamente `.qz-certs/override.crt` al PC.
