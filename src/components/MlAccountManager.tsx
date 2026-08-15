@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Link2, Pencil, Plus, Save, Store, Unlink, X } from 'lucide-react';
+import { Check, Link2, Pencil, Plus, RefreshCw, Save, Store, Unlink, X } from 'lucide-react';
 import { showConfirmModal, showToast } from '@/lib/toast';
 
 type MlAccount = {
@@ -81,7 +81,7 @@ export default function MlAccountManager() {
   };
 
   const generateAuthorization = async () => {
-    if (linkingAccount) return;
+    if (linkingAccount) return false;
     setLinkingAccount(true);
     try {
       const response = await fetch('/api/admin/ml-accounts', {
@@ -93,10 +93,27 @@ export default function MlAccountManager() {
       if (!response.ok) throw new Error(data.error || 'No se pudo generar el enlace');
       setAuthorization(data);
       showToast('Enlace generado. Ábrelo para autorizar la cuenta.', 'success');
+      return true;
     } catch (error: any) {
       showToast(error.message, 'error');
+      return false;
     } finally {
       setLinkingAccount(false);
+    }
+  };
+
+  const reauthorizeAccount = async (account: MlAccount) => {
+    const label = account.alias || account.nickname;
+    const confirmation = await showConfirmModal(
+      `¿Reautorizar ${label}?`,
+      `Abre el enlace iniciando sesión en la cuenta ML ${account.nickname}. Esto renueva sus tokens sin borrar órdenes ni desvincularla de ninguna aplicación.`,
+      'Generar enlace',
+    );
+    if (!confirmation.isConfirmed) return;
+
+    const generated = await generateAuthorization();
+    if (generated) {
+      document.getElementById('ml-authorization-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
@@ -179,11 +196,11 @@ export default function MlAccountManager() {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-sky-500/20 bg-wms-surface p-4 md:p-6">
+      <div id="ml-authorization-panel" className="rounded-2xl border border-sky-500/20 bg-wms-surface p-4 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-black uppercase tracking-wider text-white">Vincular una cuenta nueva</p>
-            <p className="mt-1 text-xs text-wms-muted">La autorización ocurre en Mercado Libre mediante un enlace temporal.</p>
+            <p className="text-sm font-black uppercase tracking-wider text-white">Vincular o reautorizar una cuenta</p>
+            <p className="mt-1 text-xs text-wms-muted">La autorización ocurre en Mercado Libre mediante un enlace temporal y no elimina órdenes existentes.</p>
             <p className="mt-2 text-xs text-amber-400">Si ya está conectada a Leon Express, selecciónala entre las cuentas disponibles.</p>
           </div>
           {!authorization ? (
@@ -300,6 +317,10 @@ export default function MlAccountManager() {
                 <div><dt className="mb-1 font-bold text-wms-muted">ID gateway</dt><dd className="break-all font-mono text-[10px] text-white/70">{account.gatewayAccountId}</dd></div>
                 {account.siteId && <div className="flex items-center justify-between gap-3"><dt className="font-bold text-wms-muted">Sitio</dt><dd className="font-mono text-white">{account.siteId}</dd></div>}
               </dl>
+              <button type="button" onClick={() => reauthorizeAccount(account)} disabled={linkingAccount}
+                className="mt-4 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-4 text-[10px] font-black uppercase tracking-wider text-amber-300 transition-colors hover:bg-amber-400/[0.14] disabled:opacity-50">
+                <RefreshCw size={14} /> Reautorizar acceso
+              </button>
             </article>
           ))}
         </div>

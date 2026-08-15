@@ -30,6 +30,20 @@ type TokenCache = {
 
 const tokenCache = new Map<string, TokenCache>();
 
+function gatewayTokenError(status: number, responseBody: string): Error {
+  if (/bad decrypt|ERR_OSSL_BAD_DECRYPT|Provider routines.*decrypt/i.test(responseBody)) {
+    return new Error(
+      'La autorización de Mercado Libre ya no puede descifrarse. Reautoriza la cuenta desde Supervisor → Cuentas ML.',
+    );
+  }
+
+  if (status === 401 || status === 403) {
+    return new Error('El gateway rechazó la credencial del WMS. Revisa la configuración de ML_GATEWAY_API_KEY.');
+  }
+
+  return new Error(`No se pudo obtener la autorización de Mercado Libre (gateway ${status}).`);
+}
+
 /**
  * Obtiene un access_token válido desde el gateway.
  * Hace cache del token y lo refresca solo cuando expira.
@@ -51,7 +65,8 @@ async function getAccessToken(gatewayAccountId: string): Promise<string> {
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Failed to get ML token: ${res.status} - ${err}`);
+    console.error(`[ML Gateway] Error obteniendo token (${res.status}): ${err}`);
+    throw gatewayTokenError(res.status, err);
   }
 
   const data = await res.json();

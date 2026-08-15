@@ -5,6 +5,7 @@ export type MlAccountConfig = {
   gatewayAccountId: string;
   sellerId: string;
   nickname: string;
+  alias: string | null;
   siteId: string | null;
   isLegacyEnv: boolean;
 };
@@ -15,6 +16,7 @@ export function getLegacyMlAccount(): MlAccountConfig {
     gatewayAccountId: process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70',
     sellerId: process.env.ML_SELLER_ID || '1513023287',
     nickname: 'Cuenta configurada en .env',
+    alias: null,
     siteId: null,
     isLegacyEnv: true,
   };
@@ -36,6 +38,7 @@ export async function getActiveMlAccounts(): Promise<MlAccountConfig[]> {
       gatewayAccountId: account.gatewayAccountId,
       sellerId: account.sellerId,
       nickname: account.nickname,
+      alias: account.alias,
       siteId: account.siteId,
       isLegacyEnv: false,
     }));

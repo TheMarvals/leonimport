@@ -514,7 +514,7 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
           : await fetchAllPendingOrders(account)));
         successfullySyncedAccountIds.add(account.gatewayAccountId);
       } catch (error: any) {
-        const message = `${account.nickname}: ${error.message || 'error desconocido'}`;
+        const message = `${account.alias || account.nickname}: ${error.message || 'error desconocido'}`;
         accountErrors.push(message);
         console.error(`[Sync] Falló cuenta ML ${message}`);
       }
