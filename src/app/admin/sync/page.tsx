@@ -110,7 +110,7 @@ export default function SyncDashboardPage() {
   const handleSyncAndRefresh = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/sync/ml', { method: 'POST' });
+      const res = await fetch('/api/sync/ml?force=true', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         const imported = data.imported ?? 0;

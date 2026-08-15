@@ -243,19 +243,26 @@ export default function PickingPage() {
   // Timer para el cooldown de sincronización
   // Mutación: sincronización con ML
   const syncMutation = useMutation({
-    mutationFn: () => fetch('/api/sync/ml', { method: 'POST' }).then(r => r.json()),
+    mutationFn: async () => {
+      const response = await fetch('/api/sync/ml?force=true', { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'No se pudo sincronizar con Mercado Libre');
+      }
+      return data;
+    },
     onSuccess: (data) => {
       showToast(`Sincronización exitosa: ${data.imported} importadas, ${data.resolutionRequired} requieren resolución, ${data.skipped} omitidas`, 'success');
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       setSyncCooldown(30);
     },
-    onError: (err) => {
-      showToast('Error de conexión con el Gateway.', 'error');
+    onError: (err: Error) => {
+      showToast(err.message || 'Error de conexión con el Gateway.', 'error');
     },
   });
 
   // Mantener la cola conectada con Mercado Libre sin depender del botón manual.
-  // El lock del backend evita que dos estaciones ejecuten el sync en paralelo.
+  // El backend aplica un cooldown distribuido entre todas las estaciones.
   useEffect(() => {
     let cancelled = false;
 
