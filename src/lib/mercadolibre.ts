@@ -31,7 +31,7 @@ type TokenCache = {
 const tokenCache = new Map<string, TokenCache>();
 
 function gatewayTokenError(status: number, responseBody: string): Error {
-  if (/bad decrypt|ERR_OSSL_BAD_DECRYPT|Provider routines.*decrypt/i.test(responseBody)) {
+  if (/bad decrypt|ERR_OSSL_BAD_DECRYPT|Provider routines.*decrypt|TOKEN_DECRYPTION_FAILED|ML_AUTH_UNAVAILABLE/i.test(responseBody)) {
     return new Error(
       'La autorización de Mercado Libre ya no puede descifrarse. Reautoriza la cuenta desde Supervisor → Cuentas ML.',
     );
