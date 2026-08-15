@@ -138,6 +138,7 @@ export type MlOrder = {
 export type MlShipment = {
   id: number;
   status: string;
+  substatus?: string | null;
   logistic_type: string;
   shipping_mode: string;
   date_created: string;
@@ -404,8 +405,27 @@ export type MlShipmentOrder = {
   shipping_details: object | null;
   buyer_name: string | null;
   shipping_status: string | null;
+  shipping_substatus: string | null;
   order_status: string | null;
 };
+
+// En Cross Docking, la interfaz de ML muestra "En camino" aunque el status
+// principal todavía sea ready_to_ship. Estos subestados confirman que el
+// paquete ya salió de la custodia del vendedor.
+const CARRIER_CUSTODY_SUBSTATUSES = new Set([
+  'picked_up',
+  'authorized_by_carrier',
+  'in_hub',
+]);
+
+export function hasShipmentLeftSellerCustody(
+  shippingStatus: string | null | undefined,
+  shippingSubstatus: string | null | undefined,
+): boolean {
+  return shippingStatus === 'shipped'
+    || shippingStatus === 'delivered'
+    || CARRIER_CUSTODY_SUBSTATUSES.has(shippingSubstatus || '');
+}
 
 /**
  * Obtiene órdenes listas para despachar (ready_to_ship) desde ML.
@@ -561,6 +581,7 @@ async function fetchPendingOrdersPage(
       shipping_details: shippingDetails,
       buyer_name: buyerName,
       shipping_status: shipment?.status || order.shipping?.status || null,
+      shipping_substatus: shipment?.substatus || null,
       order_status: orderDetail.status || null,
     };
   }, 10);
@@ -599,6 +620,7 @@ function groupOrdersByShipment(results: MlShipmentOrder[]): MlShipmentOrder[] {
 function isActionablePendingOrder(order: MlShipmentOrder): boolean {
   return Boolean(order.ml_shipping_id)
     && order.shipping_status === 'ready_to_ship'
+    && !hasShipmentLeftSellerCustody(order.shipping_status, order.shipping_substatus)
     && order.order_status === 'paid'
     && order.logistic_type !== 'fulfillment';
 }
@@ -746,6 +768,7 @@ export async function fetchSingleOrder(
     shipping_details: shippingDetails,
     buyer_name: buyerName,
     shipping_status: shipment?.status || orderDetail.shipping?.status || null,
+    shipping_substatus: shipment?.substatus || null,
     order_status: orderDetail.status || null,
   };
 }

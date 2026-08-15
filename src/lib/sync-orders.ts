@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import RedisManager from './redis';
-import { fetchAllPendingOrders, fetchPendingOrders, fetchSingleOrder } from './mercadolibre';
+import { fetchAllPendingOrders, fetchPendingOrders, fetchSingleOrder, hasShipmentLeftSellerCustody } from './mercadolibre';
 import { generateSku, extractFamilyBase } from './sku-generator';
 import { normalizeProductCode } from './product-matching';
 import { getActiveMlAccounts } from './ml-accounts';
@@ -404,7 +404,10 @@ export async function refreshOrder(orderId: string) {
 
   // 3.5. Evaluar estado (Cancelado o Despachado)
   const isCancelled = freshData.order_status === 'cancelled' || freshData.shipping_status === 'cancelled';
-  const isShipped = freshData.shipping_status === 'shipped' || freshData.shipping_status === 'delivered';
+  const isShipped = hasShipmentLeftSellerCustody(
+    freshData.shipping_status,
+    freshData.shipping_substatus,
+  );
   
   let newStatus = order.status;
   if (isCancelled && order.status !== 'CANCELLED') newStatus = 'CANCELLED' as any;
@@ -578,7 +581,10 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
         // También actualizamos priorityMessage si cambió (viejo formato → nuevo formato amigable)
         // También evaluamos si fue cancelada o despachada en la vista reciente
         const isCancelled = shipment.order_status === 'cancelled' || shipment.shipping_status === 'cancelled';
-        const isShipped = shipment.shipping_status === 'shipped' || shipment.shipping_status === 'delivered';
+        const isShipped = hasShipmentLeftSellerCustody(
+          shipment.shipping_status,
+          shipment.shipping_substatus,
+        );
         let newStatus = existingOrder.status;
         if (isCancelled && existingOrder.status !== 'CANCELLED') newStatus = 'CANCELLED' as any;
         else if (isShipped && existingOrder.status !== 'SHIPPED') newStatus = 'SHIPPED' as any;
@@ -648,7 +654,7 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
 
       if (mlOrderStatus === 'cancelled' || mlOrderStatus === 'invalid' || mlShippingStatus === 'cancelled') {
         newStatus = 'CANCELLED';
-      } else if (mlShippingStatus === 'shipped' || mlShippingStatus === 'delivered') {
+      } else if (hasShipmentLeftSellerCustody(mlShippingStatus, shipment.shipping_substatus)) {
         newStatus = 'SHIPPED';
       } else if (!shipment.ml_shipping_id || shipment.logistic_type === 'fulfillment') {
         // Si no tiene ID de envío (ej. compra sin envío / retira en tienda) o es FULL (gestionado por MercadoLibre),
