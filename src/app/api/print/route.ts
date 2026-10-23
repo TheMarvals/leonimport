@@ -27,16 +27,13 @@ export async function POST(req: NextRequest) {
       }, { status: 503 });
     }
 
-    // 1. Obtener el PDF con multi-intento (gateway → ML directo → fallback local)
-    const { buffer, source } = await fetchLabel(mlId);
+    // 1. Obtener el PDF con consulta directa a Mercado Libre
+    const { buffer } = await fetchLabel(mlId);
     
     // 2. Extraer solo la primera página
     const singlePage = await extractFirstPage(buffer);
 
-    const sourceLabel = 
-      source === 'gateway' ? 'ML Gateway' :
-      source === 'ml-direct' ? 'ML Directo' :
-      'Local (fallback)';
+    const sourceLabel = 'Mercado Libre';
 
     console.log(`[PrintRoute] Etiqueta obtenida desde ${sourceLabel} para ${mlId}`);
 
