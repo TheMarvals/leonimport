@@ -122,6 +122,7 @@ model Location {
 model Cubicle {
   id        String   @id @default(uuid())
   number    Int      @unique
+  maxOrders Int      @default(5)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -133,6 +134,7 @@ model ProductLocation {
   productId  String
   locationId String
   quantity   Int      @default(0)
+  reserved   Int      @default(0)
   location   Location @relation(fields: [locationId], references: [id])
   product    Product  @relation(fields: [productId], references: [id])
 
@@ -162,6 +164,7 @@ model Order {
   cubicleId      String?
   mlAccountId    String?
   cubicleNumber  Int?
+  isPartiallyPicked Boolean @default(false)
   cubicle        Cubicle?   @relation(fields: [cubicleId], references: [id], onDelete: SetNull)
   mlAccount      MercadoLibreAccount? @relation(fields: [mlAccountId], references: [id], onDelete: SetNull)
   auditLogs      AuditLog[]
@@ -258,6 +261,7 @@ enum SyncStatus {
 enum OrderStatus {
   PENDING
   PICKING
+  PARTIALLY_PICKED
   RESOLUTION_REQUIRED
   PACKING
   SHIPPED

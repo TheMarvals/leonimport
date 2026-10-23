@@ -23,4 +23,6 @@ RUN npx prisma generate --schema=./prisma/schema.prisma \
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --schema=./prisma/schema.prisma && npm run start -- --hostname 0.0.0.0 --port ${PORT:-3000}"]
+# Schema changes must be reviewed and applied separately from application startup.
+# Running db push here can attempt to remove fields added by another release.
+CMD ["sh", "-c", "npm run start -- --hostname 0.0.0.0 --port ${PORT:-3000}"]
