@@ -1,3 +1,4 @@
+import { usableName, buyerNameUpdate } from './ml-recipient';
 import { prisma } from './prisma';
 import RedisManager from './redis';
 import { fetchAllPendingOrders, fetchPendingOrders, fetchSingleOrder, hasShipmentLeftSellerCustody } from './mercadolibre';
@@ -422,7 +423,7 @@ export async function refreshOrder(orderId: string) {
       isTurbo,
       isCollection,
       priorityMessage,
-      buyerName: freshData.buyer_name ?? undefined,
+      buyerName: buyerNameUpdate(order.buyerName, freshData.buyer_name),
       shippingId: freshData.ml_shipping_id ?? undefined,
     } as any
   });
@@ -568,7 +569,7 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
         shippingDetails
       );
 
-      const buyerName = shipment.buyer_name || null;
+      const buyerName = usableName(shipment.buyer_name);
 
       // Check if order already exists in our DB (desde los Maps pre-cargados)
       const existingOrder = existingOrdersByMlId.get(mlIdStr) 
@@ -589,6 +590,7 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
         if (isCancelled && existingOrder.status !== 'CANCELLED') newStatus = 'CANCELLED' as any;
         else if (isShipped && existingOrder.status !== 'SHIPPED') newStatus = 'SHIPPED' as any;
 
+        const recoveredName = buyerNameUpdate(existingOrder.buyerName, shipment.buyer_name);
         const needsStatusUpdate = newStatus !== existingOrder.status;
         const needsMetadataUpdate = !existingOrder.mlOrderId || !existingOrder.shippingId;
         const needsMlIdFix = existingOrder.mlId !== mlIdStr; // mlId viejo era shipping ID (2000...)
@@ -598,7 +600,7 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
         const localAccountId = localAccountIdByGatewayId.get(shipment.accountId);
         const needsAccountUpdate = Boolean(localAccountId && existingOrder.mlAccountId !== localAccountId);
 
-        if (needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate || needsAccountUpdate || needsTurboUpdate || needsCollectionUpdate) {
+        if (recoveredName !== undefined || needsMetadataUpdate || needsMlIdFix || needsPriorityUpdate || needsStatusUpdate || needsAccountUpdate || needsTurboUpdate || needsCollectionUpdate) {
           await prisma.order.update({
             where: { id: existingOrder.id },
             data: {
@@ -609,7 +611,7 @@ export async function syncOrders(limit?: number, offset: number = 0): Promise<Sy
               isFlex: shipment.is_flex ?? undefined,
               isTurbo,
               isCollection,
-              buyerName: shipment.buyer_name ?? undefined,
+              buyerName: recoveredName,
               priorityMessage,
               mlAccountId: localAccountId,
             } as any

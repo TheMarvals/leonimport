@@ -1,3 +1,4 @@
+import { usableName, fetchRecipientName } from './ml-recipient';
 import { getHighResImageUrl } from './image-utils';
 import RedisManager from './redis';
 import type { MlAccountConfig } from './ml-accounts';
@@ -558,9 +559,9 @@ async function fetchPendingOrdersPage(
     }
 
     // Nombre del comprador
-    const buyerName = order.buyer
-      ? [order.buyer.first_name, order.buyer.last_name].filter(Boolean).join(' ') || order.buyer.nickname
-      : null;
+    const buyerName = usableName([orderDetail.buyer?.first_name, orderDetail.buyer?.last_name].filter(Boolean).join(' '))
+      || await fetchRecipientName(order.id, shippingId, headers)
+      || usableName(orderDetail.buyer?.nickname);
 
     return {
       accountId: gatewayAccountId,
@@ -745,9 +746,9 @@ export async function fetchSingleOrder(
     shippingDetails = { logistic_type: logisticType };
   }
 
-  const buyerName = orderDetail.buyer
-    ? [orderDetail.buyer.first_name, orderDetail.buyer.last_name].filter(Boolean).join(' ') || orderDetail.buyer.nickname
-    : null;
+  const buyerName = usableName([orderDetail.buyer?.first_name, orderDetail.buyer?.last_name].filter(Boolean).join(' '))
+    || await fetchRecipientName(orderDetail.id, shippingId, headers)
+    || usableName(orderDetail.buyer?.nickname);
 
   return {
     accountId: gatewayAccountId,
