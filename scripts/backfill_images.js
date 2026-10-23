@@ -15,7 +15,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // Configuración del Gateway (tomada de .env)
-const GATEWAY_URL = process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com';
+const GATEWAY_URL = process.env.ML_GATEWAY_URL || 'https://gateway.leonexpress.cl';
 const GATEWAY_API_KEY = process.env.ML_GATEWAY_API_KEY || 'le-ml-gateway-dev-key-2026';
 
 async function backfillWmsImages() {

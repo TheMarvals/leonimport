@@ -1,5 +1,5 @@
 export function getMlGatewayUrl(): string {
-  return (process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com').replace(/\/+$/, '');
+  return (process.env.ML_GATEWAY_URL || 'https://gateway.leonexpress.cl').replace(/\/+$/, '');
 }
 
 export function getMlGatewayApiKey(): string {

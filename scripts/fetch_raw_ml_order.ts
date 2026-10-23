@@ -15,7 +15,7 @@ if (fs.existsSync(envPath)) {
   });
 }
 
-const GATEWAY_URL = process.env.ML_GATEWAY_URL || 'https://gateway.themarvals.com';
+const GATEWAY_URL = process.env.ML_GATEWAY_URL || 'https://gateway.leonexpress.cl';
 const GATEWAY_API_KEY = process.env.ML_GATEWAY_API_KEY || '';
 const ML_ACCOUNT_ID = process.env.ML_ACCOUNT_ID || 'a7c9cdcf-4fbb-4e39-be78-a69bfea76d70';
 
